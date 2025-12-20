@@ -1,14 +1,27 @@
 <?php
 // post_action.php
-require 'db.php'; // Carrega sessão e banco
+require 'db.php'; 
 
-header('Content-Type: application/json'); // Padrão para AJAX é JSON, exceto redirecionamentos
+header('Content-Type: application/json');
 
 $action = $_POST['action'] ?? '';
 
-// Para ações normais (Login, Registro, etc), precisamos desligar o header JSON
-// ou o navegador vai mostrar o JSON em vez de redirecionar.
-// Vamos lidar com isso caso a caso.
+if ($action === 'update_profile') {
+    if (!isset($_SESSION['user_id'])) {
+        header("Location: login.php");
+        exit;
+    }
+
+    $bio = trim($_POST['bio']);
+    // Limite simples de caracteres
+    if (strlen($bio) > 100) $bio = substr($bio, 0, 100);
+
+    $stmt = $pdo->prepare("UPDATE users SET bio = ? WHERE id = ?");
+    $stmt->execute([$bio, $_SESSION['user_id']]);
+
+    header("Location: profile.php?id=" . $_SESSION['user_id']);
+    exit;
+}
 
 if ($action === 'vote_ajax') {
     // === VOTAÇÃO VIA AJAX (SEM REFRESH) ===
