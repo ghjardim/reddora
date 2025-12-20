@@ -14,6 +14,7 @@ if (!isset($_GET['id'])) {
 
 $profile_id = (int)$_GET['id'];
 $active_tab = $_GET['tab'] ?? 'all';
+$current_user_id = $_SESSION['user_id'];
 
 // 1. Busca Usuário
 $stmt = $pdo->prepare("SELECT username, created_at FROM users WHERE id = ?");
@@ -26,12 +27,19 @@ $stmt = $pdo->prepare("SELECT q.*, s.name as sig_name FROM questions q JOIN sigs
 $stmt->execute([$profile_id]);
 $questions = $stmt->fetchAll();
 
-// 3. Busca Respostas
-$stmt = $pdo->prepare("SELECT a.*, q.title as question_title, q.id as question_id FROM answers a JOIN questions q ON a.question_id = q.id WHERE a.user_id = ? ORDER BY a.created_at DESC");
-$stmt->execute([$profile_id]);
+// 3. Busca Respostas (COM VOTOS para o AJAX)
+$stmt = $pdo->prepare("
+    SELECT a.*, q.title as question_title, q.id as question_id, v.vote_type as user_vote
+    FROM answers a
+    JOIN questions q ON a.question_id = q.id
+    LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ?
+    WHERE a.user_id = ?
+    ORDER BY a.created_at DESC
+");
+$stmt->execute([$current_user_id, $profile_id]);
 $answers = $stmt->fetchAll();
 
-// 4. Busca Sigs que o usuário participa
+// 4. Busca Sigs que o usuário participa (PARA A LATERAL)
 $stmt = $pdo->prepare("
     SELECT s.* FROM sigs s
     JOIN sig_memberships m ON s.id = m.sig_id
@@ -41,7 +49,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$profile_id]);
 $user_sigs = $stmt->fetchAll();
 
-// 5. Calcula Karma
+// 5. Calcula Karma Total
 $stmt = $pdo->prepare("SELECT SUM(votes) FROM answers WHERE user_id = ?");
 $stmt->execute([$profile_id]);
 $total_karma = $stmt->fetchColumn() ?: 0;
@@ -141,7 +149,7 @@ if ($active_tab === 'all') {
                                     </div>
                                 </div>
 
-                            <?php else: $ans = $item['data']; ?>
+                            <?php else: $ans = $item['data']; $ans_id = $ans['id']; ?>
                                 <div class="list-group-item py-3 border-0 border-bottom">
                                     <small class="text-muted">
                                         <i class="fas fa-comment"></i> Respondeu em:
@@ -154,7 +162,22 @@ if ($active_tab === 'all') {
                                     </p>
                                     <div class="d-flex justify-content-between align-items-center mt-2">
                                         <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
-                                        <span class="badge bg-light text-dark border"><?= $ans['votes'] ?> pts</span>
+
+                                        <div class="d-flex align-items-center">
+                                            <button id="btn-up-<?= $ans_id ?>"
+                                                    onclick="vote(<?= $ans_id ?>, 1)"
+                                                    class="btn btn-sm btn-link p-0 me-2 <?= $ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
+                                                    style="border:none; text-decoration:none;"><i class="fas fa-arrow-up"></i></button>
+
+                                            <span id="vote-count-<?= $ans_id ?>" class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>">
+                                                <?= $ans['votes'] ?> pts
+                                            </span>
+
+                                            <button id="btn-down-<?= $ans_id ?>"
+                                                    onclick="vote(<?= $ans_id ?>, -1)"
+                                                    class="btn btn-sm btn-link p-0 ms-2 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
+                                                    style="border:none; text-decoration:none;"><i class="fas fa-arrow-down"></i></button>
+                                        </div>
                                     </div>
                                 </div>
                             <?php endif; ?>
@@ -189,7 +212,7 @@ if ($active_tab === 'all') {
 
                 <?php if ($active_tab === 'answers'): ?>
                     <div class="list-group shadow-sm">
-                        <?php foreach($answers as $ans): ?>
+                        <?php foreach($answers as $ans): $ans_id = $ans['id']; ?>
                             <div class="list-group-item py-3 border-0 border-bottom">
                                 <small class="text-muted">
                                     <i class="fas fa-comment"></i> Respondeu em:
@@ -200,9 +223,22 @@ if ($active_tab === 'all') {
                                 </p>
                                 <div class="d-flex justify-content-between align-items-center mt-2">
                                     <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
-                                    <span class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>">
-                                        <?= $ans['votes'] ?> pts
-                                    </span>
+
+                                    <div class="d-flex align-items-center">
+                                        <button id="btn-up-<?= $ans_id ?>"
+                                                onclick="vote(<?= $ans_id ?>, 1)"
+                                                class="btn btn-sm btn-link p-0 me-2 <?= $ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
+                                                style="border:none; text-decoration:none;"><i class="fas fa-arrow-up"></i></button>
+
+                                        <span id="vote-count-<?= $ans_id ?>" class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= $ans['votes'] ?> pts
+                                        </span>
+
+                                        <button id="btn-down-<?= $ans_id ?>"
+                                                onclick="vote(<?= $ans_id ?>, -1)"
+                                                class="btn btn-sm btn-link p-0 ms-2 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
+                                                style="border:none; text-decoration:none;"><i class="fas fa-arrow-down"></i></button>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -260,5 +296,45 @@ if ($active_tab === 'all') {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    function vote(ansId, val) {
+        let formData = new FormData();
+        formData.append('action', 'vote_ajax');
+        formData.append('ans_id', ansId);
+        formData.append('val', val);
+
+        fetch('post_action.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if(data.status === 'success') {
+                let countEl = document.getElementById('vote-count-' + ansId);
+                countEl.innerText = data.new_total + ' pts';
+
+                // Atualiza badge de cor
+                if (data.new_total >= 0) {
+                    countEl.classList.remove('bg-danger'); countEl.classList.add('bg-success');
+                } else {
+                    countEl.classList.remove('bg-success'); countEl.classList.add('bg-danger');
+                }
+
+                // Atualiza setas
+                let btnUp = document.getElementById('btn-up-' + ansId);
+                let btnDown = document.getElementById('btn-down-' + ansId);
+
+                btnUp.classList.remove('text-success', 'text-secondary');
+                btnDown.classList.remove('text-danger', 'text-secondary');
+
+                if (data.user_vote == 1) {
+                    btnUp.classList.add('text-success'); btnDown.classList.add('text-secondary');
+                } else if (data.user_vote == -1) {
+                    btnUp.classList.add('text-secondary'); btnDown.classList.add('text-danger');
+                } else {
+                    btnUp.classList.add('text-secondary'); btnDown.classList.add('text-secondary');
+                }
+            }
+        });
+    }
+    </script>
 </body>
 </html>

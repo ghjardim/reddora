@@ -1,25 +1,39 @@
 <?php
 require 'db.php';
-if (!isset($_GET['id'])) header('Location: index.php');
+
+// CORREÇÃO: Removemos o redirect silencioso. Se der erro, mostra na tela.
+if (!isset($_GET['id'])) {
+    die("<div class='container mt-5 alert alert-danger'>Erro: Nenhum ID de pergunta fornecido na URL. <a href='index.php'>Voltar</a></div>");
+}
 $q_id = (int)$_GET['id'];
+$user_id = $_SESSION['user_id'];
 
 $stmt = $pdo->prepare("SELECT q.*, s.name as sig_name, u.username FROM questions q JOIN sigs s ON q.sig_id = s.id JOIN users u ON q.user_id = u.id WHERE q.id = ?");
 $stmt->execute([$q_id]);
 $question = $stmt->fetch();
 
-if (!$question) die("Erro.");
+if (!$question) {
+    die("<div class='container mt-5 alert alert-danger'>Erro: Pergunta não encontrada no banco de dados (ID: $q_id). <a href='index.php'>Voltar</a></div>");
+}
 
-$stmt = $pdo->prepare("SELECT a.*, u.username FROM answers a JOIN users u ON a.user_id = u.id WHERE a.question_id = ? ORDER BY a.votes DESC, a.created_at ASC");
-$stmt->execute([$q_id]);
+$stmt = $pdo->prepare("
+    SELECT a.*, u.username, v.vote_type as user_vote
+    FROM answers a
+    JOIN users u ON a.user_id = u.id
+    LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ?
+    WHERE a.question_id = ?
+    ORDER BY a.votes DESC, a.created_at ASC
+");
+$stmt->execute([$user_id, $q_id]);
 $all_answers = $stmt->fetchAll();
 
 $comments_by_parent = [];
 foreach ($all_answers as $ans) { $pid = !empty($ans['parent_id']) ? $ans['parent_id'] : 0; $comments_by_parent[$pid][] = $ans; }
 
-// Função Recursiva
 function render_replies($parent_id, $comments_by_parent, $q_id) {
     if (!isset($comments_by_parent[$parent_id])) return;
     foreach ($comments_by_parent[$parent_id] as $ans) {
+        $ans_id = $ans['id'];
         ?>
         <div class="mt-3 ps-3 thread-line">
             <div class="bg-white p-2 rounded mb-1 d-flex justify-content-between border">
@@ -27,9 +41,17 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
                     <a href="profile.php?id=<?= $ans['user_id'] ?>" class="text-dark text-decoration-none"><?= htmlspecialchars($ans['username']) ?></a>
                 </small>
                 <div class="small text-muted">
-                    <span class="fw-bold"><?= $ans['votes'] ?> pts</span>
-                    <form action="post_action.php" method="POST" class="d-inline ms-1"><input type="hidden" name="action" value="vote"><input type="hidden" name="ans_id" value="<?= $ans['id'] ?>"><input type="hidden" name="q_id" value="<?= $q_id ?>"><input type="hidden" name="val" value="1"><button class="btn btn-link p-0 text-secondary" style="text-decoration:none">▲</button></form>
-                    <form action="post_action.php" method="POST" class="d-inline"><input type="hidden" name="action" value="vote"><input type="hidden" name="ans_id" value="<?= $ans['id'] ?>"><input type="hidden" name="q_id" value="<?= $q_id ?>"><input type="hidden" name="val" value="-1"><button class="btn btn-link p-0 text-secondary" style="text-decoration:none">▼</button></form>
+                    <span id="vote-count-<?= $ans_id ?>" class="fw-bold me-2"><?= $ans['votes'] ?> pts</span>
+
+                    <button id="btn-up-<?= $ans_id ?>"
+                            onclick="vote(<?= $ans_id ?>, 1)"
+                            class="btn btn-link p-0 <?= $ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
+                            style="text-decoration:none">▲</button>
+
+                    <button id="btn-down-<?= $ans_id ?>"
+                            onclick="vote(<?= $ans_id ?>, -1)"
+                            class="btn btn-link p-0 ms-1 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
+                            style="text-decoration:none">▼</button>
                 </div>
             </div>
             <div class="text-dark small mb-2 ps-1"><?= nl2br(htmlspecialchars($ans['body'])) ?></div>
@@ -118,7 +140,9 @@ function count_children($parent_id, $comments_by_parent) {
                 </div>
 
                 <?php if (isset($comments_by_parent[0])): ?>
-                    <?php foreach ($comments_by_parent[0] as $root_ans): ?>
+                    <?php foreach ($comments_by_parent[0] as $root_ans):
+                        $ans_id = $root_ans['id'];
+                    ?>
                         <div class="card mb-3 border-0 shadow-sm">
                             <div class="card-body">
                                 <div class="d-flex align-items-center mb-3">
@@ -135,10 +159,17 @@ function count_children($parent_id, $comments_by_parent) {
 
                                 <div class="d-flex align-items-center">
                                     <div class="bg-light rounded-pill border px-2">
-                                        <form action="post_action.php" method="POST" class="d-inline"><input type="hidden" name="action" value="vote"><input type="hidden" name="ans_id" value="<?= $root_ans['id'] ?>"><input type="hidden" name="q_id" value="<?= $q_id ?>"><input type="hidden" name="val" value="1"><button class="btn btn-sm text-success fw-bold border-0">▲</button></form>
-                                        <span class="fw-bold mx-1 text-dark"><?= $root_ans['votes'] ?></span>
-                                        <form action="post_action.php" method="POST" class="d-inline"><input type="hidden" name="action" value="vote"><input type="hidden" name="ans_id" value="<?= $root_ans['id'] ?>"><input type="hidden" name="q_id" value="<?= $q_id ?>"><input type="hidden" name="val" value="-1"><button class="btn btn-sm text-secondary border-0">▼</button></form>
+                                        <button id="btn-up-<?= $ans_id ?>"
+                                                onclick="vote(<?= $ans_id ?>, 1)"
+                                                class="btn btn-sm <?= $root_ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?> fw-bold border-0">▲</button>
+
+                                        <span id="vote-count-<?= $ans_id ?>" class="fw-bold mx-1 text-dark"><?= $root_ans['votes'] ?></span>
+
+                                        <button id="btn-down-<?= $ans_id ?>"
+                                                onclick="vote(<?= $ans_id ?>, -1)"
+                                                class="btn btn-sm <?= $root_ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?> border-0">▼</button>
                                     </div>
+
                                     <button class="btn btn-sm text-secondary fw-bold ms-3" onclick="document.getElementById('root-reply-form-<?= $root_ans['id'] ?>').classList.toggle('d-none')">
                                         <i class="far fa-comment"></i> Responder
                                     </button>
@@ -168,5 +199,36 @@ function count_children($parent_id, $comments_by_parent) {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    function vote(ansId, val) {
+        let formData = new FormData();
+        formData.append('action', 'vote_ajax');
+        formData.append('ans_id', ansId);
+        formData.append('val', val);
+
+        fetch('post_action.php', { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'success') {
+                document.getElementById('vote-count-' + ansId).innerText = (data.new_total == null ? 0 : data.new_total);
+
+                let btnUp = document.getElementById('btn-up-' + ansId);
+                let btnDown = document.getElementById('btn-down-' + ansId);
+
+                btnUp.classList.remove('text-success', 'text-secondary');
+                btnDown.classList.remove('text-danger', 'text-secondary');
+
+                if (data.user_vote == 1) {
+                    btnUp.classList.add('text-success'); btnDown.classList.add('text-secondary');
+                } else if (data.user_vote == -1) {
+                    btnUp.classList.add('text-secondary'); btnDown.classList.add('text-danger');
+                } else {
+                    btnUp.classList.add('text-secondary'); btnDown.classList.add('text-secondary');
+                }
+            }
+        });
+    }
+    </script>
 </body>
 </html>
