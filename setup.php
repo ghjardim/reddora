@@ -7,9 +7,10 @@ $tables = ['answers', 'questions', 'sig_memberships', 'sigs', 'users'];
 foreach ($tables as $table) {
     $pdo->exec("DROP TABLE IF EXISTS $table");
 }
+echo "<div style='font-family: sans-serif; padding: 20px;'>";
 echo "<h3>1. Banco de dados limpo.</h3>";
 
-// === 2. CRIAÇÃO DA ESTRUTURA ===
+// === 2. ESTRUTURA ===
 $commands = [
     "CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,9 +50,9 @@ $commands = [
 foreach ($commands as $cmd) {
     $pdo->exec($cmd);
 }
-echo "<h3>2. Tabelas criadas.</h3>";
+echo "<h3>2. Tabelas recriadas.</h3>";
 
-// === 3. FUNÇÕES AUXILIARES (Para facilitar a criação de conteúdo) ===
+// === 3. FUNÇÕES AUXILIARES ===
 function createUser($pdo, $name) {
     $pass = password_hash('123', PASSWORD_DEFAULT);
     $stmt = $pdo->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
@@ -83,107 +84,93 @@ function joinSig($pdo, $uid, $sid) {
 
 // === 4. POPULANDO DADOS ===
 
-// -- Criando Usuários (Personas) --
-$u_admin = createUser($pdo, 'admin');
-$u_ana = createUser($pdo, 'Ana_Data');     // Data Scientist
-$u_bob = createUser($pdo, 'Bob_Psycho');   // Estudante de Psico
-$u_carl = createUser($pdo, 'Carl_Gamer');  // Gen Z gamer
-$u_dani = createUser($pdo, 'Dani_Neuro');  // TDAH e ativista
-$u_enzo = createUser($pdo, 'Enzo_2005');   // Gen Z estereotipado
-$u_tio = createUser($pdo, 'Tio_Do_Pave');  // Boomer perdido
+// -- Usuários --
+$u_admin   = createUser($pdo, 'admin');            // O Admin voltou!
+$u_sofia   = createUser($pdo, 'Sofia_Data');       // Expert em Dados
+$u_julia   = createUser($pdo, 'Julia_Psy');        // Psicóloga
+$u_dani    = createUser($pdo, 'Dani_Neuro');       // Ativista Neurodiversidade
+$u_felipe  = createUser($pdo, 'Felipe_GenZ');      // O Jovem
+$u_renato  = createUser($pdo, 'Renato_Ceticismo'); // O Polêmico
 
-echo "<h3>3. Usuários criados (Senha: 123).</h3>";
+echo "<h3>3. Usuários criados (incluindo admin).</h3>";
 
-// -- Criando SIGs --
-$s_ds = createSig($pdo, 'Data Science', 'Python, R, IA e estatística.');
-$s_psi = createSig($pdo, 'Psicologia', 'Mente humana, comportamento e terapia.');
-$s_neuro = createSig($pdo, 'Neurodiversidade', 'TDAH, Autismo e convivência.');
-$s_random = createSig($pdo, 'Papos Aleatórios', 'Conversas sem rumo e memes.');
-$s_genz = createSig($pdo, 'Gen Z', 'Cringe é quem fala cringe.');
+// -- Sigs (A lista exata que você pediu) --
+$s_ds      = createSig($pdo, 'Data Science', 'Python, R, IA, Estatística e Big Data.');
+$s_psi     = createSig($pdo, 'Psicologia', 'Mente humana, comportamento e terapia.');
+$s_neuro   = createSig($pdo, 'Neurodiversidade', 'TDAH, Autismo e convivência.');
+$s_random  = createSig($pdo, 'Papos Aleatórios', 'Conversas sem rumo, memes e histórias.');
+$s_genz    = createSig($pdo, 'Gen Z', 'Cringe é quem fala cringe. Discussões geracionais.');
 
-echo "<h3>4. Sigs criados.</h3>";
+echo "<h3>4. Sigs criados: Data Science, Psicologia, Neuro, Papos e Gen Z.</h3>";
 
-// -- Assinaturas (Quem segue o quê) --
-// Admin segue tudo
+// -- Assinaturas --
+// Admin segue tudo para testar
 for($i=1; $i<=5; $i++) joinSig($pdo, $u_admin, $i);
 
-// Ana (Data Science, Neuro, Random)
-joinSig($pdo, $u_ana, $s_ds); joinSig($pdo, $u_ana, $s_neuro); joinSig($pdo, $u_ana, $s_random);
-
-// Bob (Psico, Neuro, Gen Z)
-joinSig($pdo, $u_bob, $s_psi); joinSig($pdo, $u_bob, $s_neuro); joinSig($pdo, $u_bob, $s_genz);
-
-// Dani (Neuro, Psico, Random)
+joinSig($pdo, $u_sofia, $s_ds); joinSig($pdo, $u_sofia, $s_random);
+joinSig($pdo, $u_julia, $s_psi); joinSig($pdo, $u_julia, $s_neuro);
 joinSig($pdo, $u_dani, $s_neuro); joinSig($pdo, $u_dani, $s_psi); joinSig($pdo, $u_dani, $s_random);
+joinSig($pdo, $u_felipe, $s_genz); joinSig($pdo, $u_felipe, $s_ds);
+joinSig($pdo, $u_renato, $s_ds); joinSig($pdo, $u_renato, $s_psi); joinSig($pdo, $u_renato, $s_random);
 
-// Enzo e Carl (Gen Z, Random, Jogos se tivesse)
-joinSig($pdo, $u_enzo, $s_genz); joinSig($pdo, $u_enzo, $s_random);
-joinSig($pdo, $u_carl, $s_genz); joinSig($pdo, $u_carl, $s_ds);
+// === 5. CONTEÚDO DENSO (QUORA STYLE) ===
 
-// Tio (Random, Psico)
-joinSig($pdo, $u_tio, $s_random); joinSig($pdo, $u_tio, $s_psi);
+// ---------------------------------------------------------
+// THREAD 1: Data Science (Sofia vs Renato)
+// ---------------------------------------------------------
+$body_q1 = "Estou liderando um projeto de migração de dados e minha equipe está dividida.\n\nMetade quer continuar usando Pandas pela familiaridade, mas estamos lidando com parquets de 50GB+. A outra metade quer migrar tudo para Polars ou PySpark.\n\nO custo de reescrever a base de código (refatoração) compensa o ganho de performance? Alguém tem benchmarks reais de produção, não apenas de tutoriais?";
 
-echo "<h3>5. Assinaturas distribuídas.</h3>";
+$q1 = createQuestion($pdo, $u_sofia, $s_ds, 'Pandas vs Polars em 2025: O custo de refatoração vale a pena?', $body_q1);
 
-// === 6. GERANDO CONTEÚDO (PERGUNTAS E THREADS) ===
+    // Resposta do Admin (dando uma de técnico)
+    $ans1 = "Fizemos essa migração na minha empresa mês passado. A resposta curta é: SIM.\n\nO Pandas (mesmo o 2.0 com PyArrow) ainda sofre com o consumo de memória RAM. O Polars, por ser escrito em Rust e usar execução preguiçosa (lazy evaluation), mudou nosso jogo.\n\nTínhamos um pipeline que levava 4 horas no Pandas e consumia 64GB de RAM. Reescrevemos em Polars em 3 dias e agora roda em 20 minutos usando 8GB. A sintaxe é diferente, mas intuitiva.";
+    createAnswer($pdo, $q1, $u_admin, $ans1, 45);
 
-// --- SIG: DATA SCIENCE ---
-$q = createQuestion($pdo, $u_ana, $s_ds, 'Pandas vs Polars em 2025?', 'Estou trabalhando com um dataset de 50GB. O Pandas está engasgando. Vale a pena migrar pro Polars ou Spark direto?');
-    createAnswer($pdo, $q, $u_carl, 'Polars é vida. A sintaxe é muito mais limpa e é Rust por baixo.', 10);
-    $a = createAnswer($pdo, $q, $u_tio, 'Na minha época a gente fazia isso no Excel com VBA.', -5);
-        createAnswer($pdo, $q, $u_ana, 'Tio, 50GB no Excel explode o computador.', 20, $a);
+    // Contraponto Cético
+    createAnswer($pdo, $q1, $u_renato, "Cuidado com o hype train. Se sua equipe já sabe Pandas, o tempo que vocês vão perder aprendendo as idiossincrasias do Polars pode sair mais caro que simplesmente alugar uma máquina maior na AWS.\n\nHardware é barato; hora de engenheiro é cara.", 12);
 
-$q = createQuestion($pdo, $u_carl, $s_ds, 'Alguém conseguindo emprego Jr em IA?', 'Tá difícil, pedem 5 anos de experiência em LLM sendo que o GPT saiu "ontem".');
-    createAnswer($pdo, $q, $u_ana, 'Foca em Engenharia de Dados. O hype de IA vai passar, mas limpeza de dados é eterna.', 15);
 
-// --- SIG: PSICOLOGIA ---
-$q = createQuestion($pdo, $u_bob, $s_psi, 'Jung ou Freud?', 'Para análise de sonhos, qual abordagem vocês preferem?');
-    $a = createAnswer($pdo, $q, $u_dani, 'Jung, sem dúvidas. Os arquétipos explicam muito mais.', 8);
-        createAnswer($pdo, $q, $u_tio, 'Eu sonho que estou voando, o que significa?', 2, $a);
-            createAnswer($pdo, $q, $u_bob, 'Fuga da realidade ou desejo de liberdade.', 3, $pdo->lastInsertId());
+// ---------------------------------------------------------
+// THREAD 2: Neurodiversidade (Dani vs Julia)
+// ---------------------------------------------------------
+$body_q2 = "Fui diagnosticado com TDAH tardio (aos 28 anos) e sinto um misto de alívio e luto.\n\nAlívio por finalmente entender por que perdi tantas chaves e prazos. Luto por pensar 'quem eu poderia ter sido' se tivesse sido tratado na escola.\n\nComo lidar com essa sensação de 'tempo perdido'? O hiperfoco na medicação resolve tudo?";
 
-$q = createQuestion($pdo, $u_tio, $s_psi, 'Terapia online funciona mesmo?', 'Fico meio assim de falar meus problemas pro computador.');
-    createAnswer($pdo, $q, $u_bob, 'Funciona sim! O vínculo terapêutico se estabelece igual. O importante é você se sentir seguro.', 12);
-    createAnswer($pdo, $q, $u_dani, 'Pra mim é melhor, porque não preciso lidar com o trânsito (ansiedade social).', 10);
+$q2 = createQuestion($pdo, $u_admin, $s_neuro, 'Diagnóstico tardio de TDAH: Como lidar com o luto do "eu potencial"?', $body_q2);
 
-// --- SIG: NEURODIVERSIDADE ---
-$q = createQuestion($pdo, $u_dani, $s_neuro, 'Dica de ouro pra TDAH: Body Doubling', 'Gente, descobri que trabalhar com alguém do lado (mesmo em silêncio) me faz focar 100x mais. Alguém usa?');
-    $a = createAnswer($pdo, $q, $u_ana, 'Sim! Uso sites como o Focusmate. Mudou minha vida no home office.', 7);
-    $a2 = createAnswer($pdo, $q, $u_enzo, 'Eu boto live da Twitch de fundo, conta?', 3);
-        createAnswer($pdo, $q, $u_dani, 'Se não te distrair, conta sim!', 2, $a2);
+    $ans2 = "Essa sensação é o que chamamos clinicamente de 'Luto pelo Eu Idealizado'. É extremamente comum em diagnósticos tardios.\n\nPrimeiro, entenda que a medicação não é mágica; ela é como um óculos. Ela te permite ver, mas você ainda precisa aprender a ler.\n\nSobre o tempo perdido: não existe. Sua história, com todo o caos e criatividade não-linear, formou quem você é hoje. Muitos pacientes meus descobrem que seus mecanismos de compensação (criados para sobreviver sem remédio) se tornam superpoderes quando a ansiedade é tratada.";
+    $a2 = createAnswer($pdo, $q2, $u_julia, $ans2, 89);
 
-$q = createQuestion($pdo, $u_bob, $s_neuro, 'Hiperfoco que durou 3 dias e acabou', 'Acabei de comprar R$ 500 de material de pintura e agora não quero mais pintar. Socorro.');
-    createAnswer($pdo, $q, $u_dani, 'Bem-vindo ao clube kkkk. Guarda o material, daqui 6 meses a vontade volta.', 15);
-    createAnswer($pdo, $q, $u_tio, 'Isso é falta de disciplina.', -10); // Comentário polêmico para gerar downvotes
+        createAnswer($pdo, $q2, $u_dani, "Perfeito, Julia! Eu chorava pensando que era 'burra' ou 'preguiçosa'. O diagnóstico não muda o passado, mas reescreve a narrativa dele. Agora você sabe que não era preguiça, era uma deficiência executiva.", 34, $a2);
 
-// --- SIG: GEN Z ---
-$q = createQuestion($pdo, $u_enzo, $s_genz, 'Usar emoji de caveira é cringe?', 'Me disseram que 💀 substituiu o 😂. Confere?');
-    createAnswer($pdo, $q, $u_carl, 'Sim, 😂 é coisa de millennial. Usa 💀 ou 😭.', 5);
-    $a = createAnswer($pdo, $q, $u_tio, 'Não entendi nada.', 0);
-        createAnswer($pdo, $q, $u_enzo, 'É rir de nervoso, tio.', 2, $a);
 
-$q = createQuestion($pdo, $u_carl, $s_genz, 'Skinny jeans morreu?', 'Vi no TikTok que agora só usam calça larga.');
-    createAnswer($pdo, $q, $u_ana, 'Eu vou continuar usando minha calça justa e ninguém vai me impedir.', 20); // Millennial defendendo território
+// ---------------------------------------------------------
+// THREAD 3: Gen Z (Felipe vs Renato)
+// ---------------------------------------------------------
+$body_q3 = "Vejo muitos Millennials criticando a Gen Z por 'não querer trabalhar', mas a conta não fecha.\n\nMeus pais compraram casa e carro com o salário de um emprego mediano nos anos 90. Hoje, um salário júnior mal paga o aluguel de um estúdio.\n\nO 'quiet quitting' não é apenas uma resposta racional a um contrato social que foi quebrado pelas gerações anteriores?";
 
-// --- SIG: PAPOS ALEATÓRIOS ---
-$q = createQuestion($pdo, $u_tio, $s_random, 'Receita de pavê', 'Alguém tem aquela receita simples com bolacha maizena?');
-    $a = createAnswer($pdo, $q, $u_enzo, 'É pavê ou pacumê? Kkkkk', -20); // A piada proibida
-        createAnswer($pdo, $q, $u_tio, 'Essa é minha garoto!', 5, $a);
-    createAnswer($pdo, $q, $u_ana, 'Creme de leite, leite condensado, limão. Bate tudo e intercala com a bolacha molhada no leite.', 10);
+$q3 = createQuestion($pdo, $u_felipe, $s_genz, 'O "Quiet Quitting" é preguiça ou autodefesa econômica?', $body_q3);
 
-$q = createQuestion($pdo, $u_dani, $s_random, 'Se zumbis atacassem agora, qual seu objeto de defesa?', 'Olhe para a sua esquerda. O que tem lá?');
-    createAnswer($pdo, $q, $u_bob, 'Uma caneca de café vazia. Estou morto.', 4);
-    createAnswer($pdo, $q, $u_carl, 'Meu gato. Ele é brabo, sobrevivo.', 8);
+    $ans3 = "É autodefesa, pura e simples. O contrato social antigo era: 'Dê lealdade à empresa e a empresa cuidará de você'. Isso morreu em 2008.\n\nHoje, a lealdade é punida com aumentos abaixo da inflação, enquanto quem troca de emprego a cada 2 anos aumenta o salário em 20%.\n\nA Gen Z apenas percebeu isso mais cedo porque já nascemos na crise. Não vamos dar 110% por 1% de retorno.";
+    $a3 = createAnswer($pdo, $q3, $u_sofia, $ans3, 120);
 
-echo "<h3>6. Conteúdo gerado! Muitas perguntas e respostas criadas.</h3>";
-echo "<p><b>Logins disponíveis (Senha para todos: 123):</b></p>";
-echo "<ul>";
-echo "<li>admin</li>";
-echo "<li>Ana_Data (Data Science)</li>";
-echo "<li>Bob_Psycho (Psicologia)</li>";
-echo "<li>Dani_Neuro (Neurodiversidade)</li>";
-echo "<li>Enzo_2005 (Gen Z)</li>";
-echo "<li>Tio_Do_Pave (Aleatórios)</li>";
-echo "</ul>";
-echo "<br><a href='login.php' class='btn btn-primary'>Ir para Login</a>";
+    createAnswer($pdo, $q3, $u_renato, "Vocês racionalizam demais a falta de garra. Toda geração teve crises. A diferença é que a de vocês tem TikTok para chorar em público e ganhar like por isso. O mercado pune quem faz o mínimo, independente da geração.", -15);
+
+
+// ---------------------------------------------------------
+// THREAD 4: Papos Aleatórios (Admin)
+// ---------------------------------------------------------
+$body_q4 = "Estou num debate acalorado aqui em casa. Se vocês tivessem que comer APENAS UMA culinária pelo resto da vida, qual seria?\n\nRegras: Tem que incluir café da manhã, almoço e jantar. E tem que ser saudável o suficiente pra você não morrer em 1 ano.";
+
+$q4 = createQuestion($pdo, $u_admin, $s_random, 'Qual a melhor culinária do mundo para viver exclusivamente dela?', $body_q4);
+
+    createAnswer($pdo, $q4, $u_felipe, "Japonesa, sem dúvidas. Sushi, Ramen, Teishoku... tem tudo. É saudável, tem peixe, tem vegetais e é deliciosa.", 20);
+
+    $ans4 = "Italiana. E não aceito discussões.\n\nMas não a italiana 'americana' cheia de creme. A italiana real mediterrânea. Azeite, tomate, massas frescas, frutos do mar. É a base da dieta mediterrânea, que é a mais saudável do mundo, e ainda por cima te faz feliz.";
+    createAnswer($pdo, $q4, $u_julia, $ans4, 45);
+
+
+echo "<h3>5. Conteúdo gerado com sucesso!</h3>";
+echo "<p>Admin restaurado. Sigs restaurados. Textos longos inseridos.</p>";
+echo "<br><a href='login.php' style='background: #b92b27; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Ir para Login</a>";
+echo "</div>";
 ?>

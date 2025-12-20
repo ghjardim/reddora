@@ -21,7 +21,7 @@ $stmt = $pdo->prepare("SELECT 1 FROM sig_memberships WHERE user_id = ? AND sig_i
 $stmt->execute([$user_id, $sig_id]);
 $is_member = (bool)$stmt->fetch();
 
-// 3. Busca Perguntas e conta quantas respostas cada uma tem
+// 3. Busca Perguntas
 $stmt = $pdo->prepare("
     SELECT q.*, u.username,
     (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id) as answer_count
@@ -40,30 +40,32 @@ $questions = $stmt->fetchAll();
     <title>s/<?= htmlspecialchars($sig['name']) ?> - Reddora</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-light">
+<body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
             <div class="d-flex align-items-center">
                 <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white text-decoration-none me-3">
-                    <i class="fas fa-user"></i> <?= htmlspecialchars($_SESSION['username']) ?>
+                    <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?>
                 </a>
-                <a href="index.php" class="btn btn-sm btn-outline-light">Voltar ao Feed</a>
+                <a href="index.php" class="btn btn-sm btn-outline-light opacity-75">Voltar</a>
             </div>
         </div>
     </nav>
 
     <div class="container mb-5">
 
-        <div class="card shadow border-0 mb-4">
-            <div class="card-body p-4 bg-white rounded">
+        <div class="card shadow-sm border-0 mb-4 bg-white">
+            <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="fw-bold text-primary mb-0">s/<?= htmlspecialchars($sig['name']) ?></h1>
+                        <h1 class="fw-bold text-dark mb-0">s/<?= htmlspecialchars($sig['name']) ?></h1>
                         <p class="text-muted mt-1 mb-0 fs-5"><?= htmlspecialchars($sig['description']) ?></p>
                     </div>
+
                     <div>
                         <?php if ($is_member): ?>
                             <form action="post_action.php" method="POST">
@@ -89,33 +91,39 @@ $questions = $stmt->fetchAll();
             <div class="col-md-8 mx-auto">
 
                 <?php if($is_member): ?>
-                    <div class="card mb-4 shadow-sm border-primary">
-                        <div class="card-body">
-                            <h6 class="card-title text-muted">Criar post em s/<?= htmlspecialchars($sig['name']) ?></h6>
+                    <div class="card mb-4 shadow-sm border-0">
+                        <div class="card-body bg-white rounded">
+                            <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">Criar post em s/<?= htmlspecialchars($sig['name']) ?></h6>
                             <form action="post_action.php" method="POST">
                                 <input type="hidden" name="action" value="create_question">
                                 <input type="hidden" name="sig_id" value="<?= $sig['id'] ?>">
+
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título interessante..." required>
-                                <textarea name="body" class="form-control mb-2" placeholder="Conteúdo do post..." rows="2"></textarea>
+                                <textarea name="body" class="form-control mb-2" placeholder="O que você quer compartilhar?" rows="2"></textarea>
+
                                 <div class="text-end">
-                                    <button type="submit" class="btn btn-primary px-4 rounded-pill">Postar</button>
+                                    <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">Postar</button>
                                 </div>
                             </form>
                         </div>
                     </div>
+                <?php else: ?>
+                    <div class="alert alert-light text-center border shadow-sm mb-4">
+                        Você precisa entrar nesta comunidade para postar.
+                    </div>
                 <?php endif; ?>
 
-                <h4 class="mb-3">Discussões Recentes</h4>
+                <h5 class="mb-3 fw-bold text-dark border-bottom pb-2">Discussões Recentes</h5>
 
                 <?php if(empty($questions)): ?>
-                    <div class="text-center py-5 text-muted border rounded bg-white">
-                        <i class="fas fa-wind fa-2x mb-2"></i><br>
+                    <div class="text-center py-5 text-muted border rounded bg-white shadow-sm">
+                        <i class="fas fa-wind fa-2x mb-2 opacity-50"></i><br>
                         Ainda não há discussões aqui.
                     </div>
                 <?php endif; ?>
 
                 <?php foreach($questions as $q): ?>
-                <div class="card mb-3 shadow-sm hover-shadow">
+                <div class="card mb-3 hover-card">
                     <div class="card-body">
                         <div class="d-flex justify-content-between text-muted small mb-2">
                             <span>
@@ -127,11 +135,11 @@ $questions = $stmt->fetchAll();
                             <span><?= date('d/m H:i', strtotime($q['created_at'])) ?></span>
                         </div>
 
-                        <h5 class="card-title mb-2">
-                            <a href="question.php?id=<?= $q['id'] ?>" class="text-decoration-none text-dark">
+                        <h4 class="card-title h5 mb-2">
+                            <a href="question.php?id=<?= $q['id'] ?>" class="question-link text-dark">
                                 <?= htmlspecialchars($q['title']) ?>
                             </a>
-                        </h5>
+                        </h4>
 
                         <p class="card-text text-secondary mb-3">
                             <?= htmlspecialchars(substr($q['body'], 0, 140)) . (strlen($q['body']) > 140 ? '...' : '') ?>
@@ -140,7 +148,6 @@ $questions = $stmt->fetchAll();
                         <a href="question.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
                             <i class="far fa-comments me-1"></i> Ver Discussão (<?= $q['answer_count'] ?>)
                         </a>
-
                     </div>
                 </div>
                 <?php endforeach; ?>
