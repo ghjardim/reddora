@@ -1,6 +1,7 @@
 <?php
 require 'db.php';
 
+// Redirecionamentos de segurança
 if (!isset($_GET['id'])) {
     if (isset($_SESSION['user_id'])) {
         header("Location: profile.php?id=" . $_SESSION['user_id']);
@@ -12,6 +13,7 @@ if (!isset($_GET['id'])) {
 }
 
 $profile_id = (int)$_GET['id'];
+$active_tab = $_GET['tab'] ?? 'all'; // 'all', 'questions', 'answers'
 
 // 1. Busca dados do Usuário
 $stmt = $pdo->prepare("SELECT username, created_at FROM users WHERE id = ?");
@@ -41,6 +43,21 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$profile_id]);
 $answers = $stmt->fetchAll();
+
+// 4. Lógica da Aba "Perfil" (Mistura tudo)
+$mixed_feed = [];
+if ($active_tab === 'all') {
+    foreach ($questions as $q) {
+        $mixed_feed[] = ['type' => 'question', 'date' => $q['created_at'], 'data' => $q];
+    }
+    foreach ($answers as $a) {
+        $mixed_feed[] = ['type' => 'answer', 'date' => $a['created_at'], 'data' => $a];
+    }
+    // Ordena por data (mais recente primeiro)
+    usort($mixed_feed, function($a, $b) {
+        return strtotime($b['date']) - strtotime($a['date']);
+    });
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -81,61 +98,116 @@ $answers = $stmt->fetchAll();
         </div>
 
         <div class="row">
-            <div class="col-md-6 mb-4">
-                <h4 class="mb-3 border-bottom pb-2"><i class="fas fa-question-circle text-primary"></i> Perguntas Feitas</h4>
+            <div class="col-md-8 mx-auto">
 
-                <?php if(empty($questions)): ?>
-                    <p class="text-muted fst-italic">Nenhuma pergunta feita ainda.</p>
+                <ul class="nav nav-tabs nav-fill mb-4 bg-white rounded-top shadow-sm">
+                    <li class="nav-item">
+                        <a class="nav-link <?= $active_tab == 'all' ? 'active fw-bold' : '' ?>" href="?id=<?= $profile_id ?>&tab=all">
+                            <i class="fas fa-stream"></i> Perfil
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $active_tab == 'questions' ? 'active fw-bold' : '' ?>" href="?id=<?= $profile_id ?>&tab=questions">
+                            <i class="fas fa-question-circle"></i> Perguntas (<?= count($questions) ?>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $active_tab == 'answers' ? 'active fw-bold' : '' ?>" href="?id=<?= $profile_id ?>&tab=answers">
+                            <i class="fas fa-comment-dots"></i> Respostas (<?= count($answers) ?>)
+                        </a>
+                    </li>
+                </ul>
+
+                <?php if ($active_tab === 'all'): ?>
+                    <?php if (empty($mixed_feed)): ?>
+                        <div class="text-center py-5 text-muted bg-white border rounded">
+                            Usuário sem atividades recentes.
+                        </div>
+                    <?php endif; ?>
+
+                    <?php foreach ($mixed_feed as $item): ?>
+                        <?php if ($item['type'] === 'question'): $q = $item['data']; ?>
+                            <div class="card mb-3 shadow-sm border-start border-4 border-primary">
+                                <div class="card-body">
+                                    <small class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">
+                                        <i class="fas fa-question-circle text-primary"></i> Perguntou em
+                                        <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none">s/<?= htmlspecialchars($q['sig_name']) ?></a>
+                                    </small>
+                                    <h5 class="mt-2">
+                                        <a href="question.php?id=<?= $q['id'] ?>" class="text-decoration-none text-dark">
+                                            <?= htmlspecialchars($q['title']) ?>
+                                        </a>
+                                    </h5>
+                                    <small class="text-muted"><?= date('d/m/Y', strtotime($q['created_at'])) ?></small>
+                                </div>
+                            </div>
+                        <?php else: $ans = $item['data']; ?>
+                            <div class="card mb-3 shadow-sm border-start border-4 border-success">
+                                <div class="card-body">
+                                    <small class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">
+                                        <i class="fas fa-comment text-success"></i> Respondeu em
+                                        <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-decoration-none fw-bold"><?= htmlspecialchars($ans['question_title']) ?></a>
+                                    </small>
+                                    <div class="mt-2 text-dark bg-light p-2 rounded small fst-italic">
+                                        "<?= htmlspecialchars(substr($ans['body'], 0, 150)) ?>..."
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-2 align-items-center">
+                                        <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
+                                        <span class="badge bg-secondary"><?= $ans['votes'] ?> votos</span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 <?php endif; ?>
 
-                <div class="list-group">
-                    <?php foreach($questions as $q): ?>
-                        <div class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between align-items-center">
-                                <h6 class="mb-1">
-                                    <a href="question.php?id=<?= $q['id'] ?>" class="text-decoration-none fw-bold text-primary">
-                                        <?= htmlspecialchars($q['title']) ?>
+                <?php if ($active_tab === 'questions'): ?>
+                    <div class="list-group shadow-sm">
+                        <?php foreach($questions as $q): ?>
+                            <div class="list-group-item list-group-item-action py-3">
+                                <div class="d-flex w-100 justify-content-between mb-1">
+                                    <h5 class="mb-1">
+                                        <a href="question.php?id=<?= $q['id'] ?>" class="text-decoration-none text-dark">
+                                            <?= htmlspecialchars($q['title']) ?>
+                                        </a>
+                                    </h5>
+                                    <small class="text-muted"><?= date('d/m', strtotime($q['created_at'])) ?></small>
+                                </div>
+                                <div class="mt-2">
+                                    <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none badge bg-light text-dark border">
+                                        s/<?= htmlspecialchars($q['sig_name']) ?>
                                     </a>
-                                </h6>
-                                <small class="text-muted ms-2"><?= date('d/m', strtotime($q['created_at'])) ?></small>
+                                </div>
                             </div>
-
-                            <div class="mt-1">
-                                <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none badge bg-light text-dark border">
-                                    s/<?= htmlspecialchars($q['sig_name']) ?>
-                                </a>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <div class="col-md-6 mb-4">
-                <h4 class="mb-3 border-bottom pb-2"><i class="fas fa-comment-dots text-success"></i> Respostas Dadas</h4>
-
-                <?php if(empty($answers)): ?>
-                    <p class="text-muted fst-italic">Nenhuma resposta dada ainda.</p>
+                        <?php endforeach; ?>
+                        <?php if(empty($questions)) echo "<div class='p-4 bg-white text-center text-muted'>Nenhuma pergunta.</div>"; ?>
+                    </div>
                 <?php endif; ?>
 
-                <div class="list-group">
-                    <?php foreach($answers as $ans): ?>
-                        <div class="list-group-item">
-                            <small class="text-muted">Em: <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-decoration-none fw-bold"><?= htmlspecialchars($ans['question_title']) ?></a></small>
-                            <p class="mb-1 mt-1 text-dark" style="font-size: 0.95rem;">
-                                "<?= htmlspecialchars(substr($ans['body'], 0, 100)) . (strlen($ans['body']) > 100 ? '...' : '') ?>"
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center mt-2">
-                                <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
-                                <span class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>">
-                                    <?= $ans['votes'] ?> votos
-                                </span>
+                <?php if ($active_tab === 'answers'): ?>
+                    <div class="list-group shadow-sm">
+                        <?php foreach($answers as $ans): ?>
+                            <div class="list-group-item py-3">
+                                <small class="text-muted">
+                                    Na discussão: <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-decoration-none fw-bold"><?= htmlspecialchars($ans['question_title']) ?></a>
+                                </small>
+                                <p class="mb-1 mt-2 p-2 bg-light rounded text-dark">
+                                    <?= nl2br(htmlspecialchars($ans['body'])) ?>
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <small class="text-muted"><?= date('d/m/Y H:i', strtotime($ans['created_at'])) ?></small>
+                                    <span class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>">
+                                        <?= $ans['votes'] ?> pontos
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                        <?php endforeach; ?>
+                        <?php if(empty($answers)) echo "<div class='p-4 bg-white text-center text-muted'>Nenhuma resposta.</div>"; ?>
+                    </div>
+                <?php endif; ?>
+
             </div>
         </div>
-
     </div>
 </body>
 </html>

@@ -3,7 +3,7 @@ require 'db.php';
 
 $user_id = $_SESSION['user_id'];
 
-// 1. Buscar os Sigs que o usuário PERTENCE
+// 1. Sidebar Sigs
 $stmt = $pdo->prepare("
     SELECT s.* FROM sigs s
     JOIN sig_memberships m ON s.id = m.sig_id
@@ -13,18 +13,30 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user_id]);
 $my_sigs = $stmt->fetchAll();
 
-// 2. Buscar Perguntas (FEED)
+// 2. Feed Answer-First
 $stmt = $pdo->prepare("
-    SELECT q.*, s.name as sig_name, u.username
-    FROM questions q
+    SELECT
+        a.id as answer_id,
+        a.body as answer_body,
+        a.votes as answer_votes,
+        a.created_at as answer_date,
+        u.id as answer_user_id,
+        u.username as answer_username,
+        q.id as question_id,
+        q.title as question_title,
+        s.id as sig_id,
+        s.name as sig_name
+    FROM answers a
+    JOIN questions q ON a.question_id = q.id
     JOIN sigs s ON q.sig_id = s.id
-    JOIN sig_memberships m ON q.sig_id = m.sig_id
-    JOIN users u ON q.user_id = u.id
+    JOIN users u ON a.user_id = u.id
+    JOIN sig_memberships m ON s.id = m.sig_id
     WHERE m.user_id = ?
-    ORDER BY q.created_at DESC
+    ORDER BY a.created_at DESC
+    LIMIT 50
 ");
 $stmt->execute([$user_id]);
-$feed_questions = $stmt->fetchAll();
+$feed_items = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -33,9 +45,15 @@ $feed_questions = $stmt->fetchAll();
     <title>Reddora - Feed</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .hover-card:hover { border-color: #0d6efd; transition: 0.3s; }
+        .question-link { color: #000; font-weight: 700; text-decoration: none; }
+        .question-link:hover { text-decoration: underline; }
+    </style>
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
             <div class="d-flex align-items-center">
@@ -53,8 +71,8 @@ $feed_questions = $stmt->fetchAll();
     <div class="container">
         <div class="row">
 
-            <div class="col-md-3">
-                <div class="card shadow-sm mb-3">
+            <div class="col-md-3 d-none d-md-block">
+                <div class="card shadow-sm mb-3 sticky-top" style="top: 80px; z-index: 1;">
                     <div class="card-header bg-white fw-bold">Seus Sigs</div>
                     <div class="list-group list-group-flush">
                         <?php foreach($my_sigs as $sig): ?>
@@ -62,87 +80,116 @@ $feed_questions = $stmt->fetchAll();
                                 <span class="fw-bold text-primary">s/<?= htmlspecialchars($sig['name']) ?></span>
                             </a>
                         <?php endforeach; ?>
-
-                        <?php if(empty($my_sigs)): ?>
-                            <div class="list-group-item text-muted small">Você não segue nenhum Sig.</div>
-                        <?php endif; ?>
                     </div>
-
-                    <div class="card-footer bg-white text-center">
-                        <a href="sigs.php" class="btn btn-primary btn-sm w-100">
-                            <i class="fas fa-compass"></i> Gerenciar Sigs
+                    <div class="card-footer bg-white p-2">
+                        <a href="sigs.php" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fas fa-compass"></i> Explorar Sigs
                         </a>
                     </div>
                 </div>
-
-                <div class="alert alert-info small">
-                    Nota: Posts de Sigs que você não segue não aparecem no feed.
-                </div>
             </div>
 
-            <div class="col-md-8">
+            <div class="col-md-7">
 
                 <div class="card mb-4 shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title">Nova Discussão</h5>
+                    <div class="card-body d-flex align-items-center bg-white rounded">
+                        <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 40px; height: 40px;">
+                            <i class="fas fa-user text-secondary"></i>
+                        </div>
+                        <button class="btn btn-light text-start text-muted flex-grow-1 rounded-pill border" type="button" data-bs-toggle="collapse" data-bs-target="#questionForm">
+                            O que você quer perguntar?
+                        </button>
+                    </div>
+                    <div class="collapse p-3 border-top" id="questionForm">
                         <form action="post_action.php" method="POST">
                             <input type="hidden" name="action" value="create_question">
-
                             <div class="mb-2">
-                                <label class="form-label small text-muted">Postar em qual Sig?</label>
-                                <select name="sig_id" class="form-select" required>
-                                    <option value="" disabled selected>Selecione um Sig...</option>
+                                <select name="sig_id" class="form-select form-select-sm mb-2" required>
+                                    <option value="" disabled selected>Escolha a Comunidade...</option>
                                     <?php foreach($my_sigs as $sig): ?>
                                         <option value="<?= $sig['id'] ?>">s/<?= htmlspecialchars($sig['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                                <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título..." required>
+                                <textarea name="body" class="form-control mb-2" placeholder="Contexto..."></textarea>
                             </div>
-
-                            <div class="mb-2">
-                                <input type="text" name="title" class="form-control" placeholder="Título da pergunta..." required>
-                            </div>
-                            <div class="mb-2">
-                                <textarea name="body" class="form-control" placeholder="Contexto (opcional)..."></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Postar</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Perguntar</button>
                         </form>
                     </div>
                 </div>
 
-                <h5 class="mb-3">Seu Feed Personalizado</h5>
-
-                <?php if(empty($feed_questions)): ?>
-                    <div class="text-center py-5 text-muted">
-                        Nenhuma pergunta encontrada nos seus Sigs. Seja o primeiro a postar!
+                <?php if(empty($feed_items)): ?>
+                    <div class="text-center py-5 text-muted border rounded bg-white">
+                        <i class="fas fa-stream fa-2x mb-3"></i><br>Seu feed está vazio.
                     </div>
                 <?php endif; ?>
 
-                <?php foreach($feed_questions as $q): ?>
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <small class="text-uppercase fw-bold" style="font-size: 0.75rem;">
-                                <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none text-primary">
-                                    s/<?= htmlspecialchars($q['sig_name']) ?>
-                                </a>
-                            </small>
-                            <small>
-                                <a href="profile.php?id=<?= $q['user_id'] ?>" class="text-muted text-decoration-none">
-                                    u/<?= htmlspecialchars($q['username']) ?>
-                                </a>
-                            </small>
+                <?php foreach($feed_items as $item): ?>
+                <div class="card mb-3 shadow-sm hover-card">
+                    <div class="card-body pb-2">
+
+                        <div class="mb-1 text-muted small">
+                            <span class="fw-bold text-dark">Pergunta em </span>
+                            <a href="sig.php?id=<?= $item['sig_id'] ?>" class="text-decoration-none fw-bold text-primary">
+                                s/<?= htmlspecialchars($item['sig_name']) ?>
+                            </a>
                         </div>
 
-                        <h5 class="card-title mt-1">
-                            <a href="question.php?id=<?= $q['id'] ?>" class="text-decoration-none text-dark">
-                                <?= htmlspecialchars($q['title']) ?>
+                        <h5 class="mb-3">
+                            <a href="question.php?id=<?= $item['question_id'] ?>" class="question-link">
+                                <?= htmlspecialchars($item['question_title']) ?>
                             </a>
                         </h5>
-                        <p class="card-text text-muted small"><?= htmlspecialchars(substr($q['body'], 0, 120)) ?>...</p>
-                        <a href="question.php?id=<?= $q['id'] ?>" class="btn btn-sm btn-outline-primary">Ver Discussão</a>
+
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 24px; height: 24px; font-size: 0.7rem;">
+                                <?= strtoupper(substr($item['answer_username'], 0, 1)) ?>
+                            </div>
+                            <div class="small">
+                                <a href="profile.php?id=<?= $item['answer_user_id'] ?>" class="fw-bold text-dark text-decoration-none">
+                                    <?= htmlspecialchars($item['answer_username']) ?>
+                                </a>
+                                <span class="text-muted">respondeu:</span>
+                            </div>
+                        </div>
+
+                        <div class="text-dark mb-3">
+                            <?php
+                                $body = htmlspecialchars($item['answer_body']);
+                                if (strlen($body) > 250) {
+                                    echo nl2br(substr($body, 0, 250)) . "...";
+                                } else {
+                                    echo nl2br($body);
+                                }
+                            ?>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                            <div class="btn-group bg-light rounded-pill border">
+                                <button class="btn btn-sm text-success fw-bold px-3" disabled>
+                                    <i class="fas fa-arrow-up"></i> <?= $item['answer_votes'] ?>
+                                </button>
+                            </div>
+
+                            <a href="question.php?id=<?= $item['question_id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
+                                <i class="far fa-comments me-1"></i> Ver Discussão
+                            </a>
+                        </div>
+
                     </div>
                 </div>
                 <?php endforeach; ?>
 
-            </div> </div> </div> </body>
+            </div>
+
+            <div class="col-md-2 d-none d-lg-block">
+               <div class="small text-muted mt-3">
+                   <p>© 2025 Reddora MVP</p>
+               </div>
+            </div>
+
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
 </html>
