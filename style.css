@@ -1,0 +1,96 @@
+/* style.css - Tema Reddora */
+
+:root {
+    --reddora-red: #b92b27;
+    --reddora-dark: #2c3e50;
+    --reddora-bg: #f4f6f8;
+    --reddora-text: #2d3436;
+    --reddora-hover: #a0221e;
+}
+
+body {
+    background-color: var(--reddora-bg);
+    color: var(--reddora-text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* === NAVBAR === */
+.bg-primary {
+    background-color: var(--reddora-dark) !important;
+}
+
+.navbar-brand {
+    font-family: 'Georgia', serif;
+    letter-spacing: 0.5px;
+}
+
+/* === BOTÕES === */
+.btn-primary {
+    background-color: var(--reddora-red);
+    border-color: var(--reddora-red);
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    background-color: var(--reddora-hover) !important;
+    border-color: var(--reddora-hover) !important;
+}
+
+.btn-outline-primary {
+    color: var(--reddora-red);
+    border-color: var(--reddora-red);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--reddora-red);
+    color: white;
+    border-color: var(--reddora-red);
+}
+
+/* === TEXTO E LINKS === */
+.text-primary {
+    color: var(--reddora-red) !important;
+}
+
+a {
+    color: var(--reddora-text);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: var(--reddora-red);
+}
+
+.question-link {
+    font-weight: 700;
+    color: var(--reddora-text);
+}
+.question-link:hover {
+    color: var(--reddora-red);
+    text-decoration: underline;
+}
+
+/* === CARDS === */
+.card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border-radius: 8px;
+    background-color: #fff;
+    transition: box-shadow 0.2s;
+}
+
+/* Efeito de hover nos cards do feed */
+.hover-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    transform: translateY(-1px);
+}
+
+/* === ELEMENTOS ESPECÍFICOS === */
+.rounded-pill {
+    border-radius: 50rem !important;
+}
+
+/* Threads / Comentários aninhados */
+.thread-line {
+    border-left: 2px solid #e9ecef;
+}

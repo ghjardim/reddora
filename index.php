@@ -13,7 +13,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user_id]);
 $my_sigs = $stmt->fetchAll();
 
-// 2. Feed Answer-First
+// 2. Feed Answer-First (Estilo Quora)
 $stmt = $pdo->prepare("
     SELECT
         a.id as answer_id,
@@ -45,24 +45,22 @@ $feed_items = $stmt->fetchAll();
     <title>Reddora - Feed</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .hover-card:hover { border-color: #0d6efd; transition: 0.3s; }
-        .question-link { color: #000; font-weight: 700; text-decoration: none; }
-        .question-link:hover { text-decoration: underline; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-light">
+<body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
+            <a class="navbar-brand fw-bold" href="index.php">
+                Reddora
+            </a>
             <div class="d-flex align-items-center">
                 <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white text-decoration-none me-3">
-                    <i class="fas fa-user"></i> <?= htmlspecialchars($_SESSION['username']) ?>
+                    <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?>
                 </a>
                 <form action="post_action.php" method="POST" class="d-inline">
                     <input type="hidden" name="action" value="logout">
-                    <button class="btn btn-sm btn-outline-light">Sair</button>
+                    <button class="btn btn-sm btn-outline-light opacity-75">Sair</button>
                 </form>
             </div>
         </div>
@@ -72,17 +70,21 @@ $feed_items = $stmt->fetchAll();
         <div class="row">
 
             <div class="col-md-3 d-none d-md-block">
-                <div class="card shadow-sm mb-3 sticky-top" style="top: 80px; z-index: 1;">
-                    <div class="card-header bg-white fw-bold">Seus Sigs</div>
+                <div class="card shadow-sm mb-3 sticky-top" style="top: 90px; z-index: 1;">
+                    <div class="card-header bg-white fw-bold text-uppercase small text-muted">Seus Sigs</div>
                     <div class="list-group list-group-flush">
                         <?php foreach($my_sigs as $sig): ?>
-                            <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                                <span class="fw-bold text-primary">s/<?= htmlspecialchars($sig['name']) ?></span>
+                            <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0">
+                                <span class="fw-bold" style="color: var(--reddora-dark)">s/<?= htmlspecialchars($sig['name']) ?></span>
                             </a>
                         <?php endforeach; ?>
+
+                        <?php if(empty($my_sigs)): ?>
+                            <div class="list-group-item text-muted small">Você não segue nada.</div>
+                        <?php endif; ?>
                     </div>
-                    <div class="card-footer bg-white p-2">
-                        <a href="sigs.php" class="btn btn-outline-primary btn-sm w-100">
+                    <div class="card-footer bg-white p-3">
+                        <a href="sigs.php" class="btn btn-outline-secondary btn-sm w-100">
                             <i class="fas fa-compass"></i> Explorar Sigs
                         </a>
                     </div>
@@ -91,10 +93,10 @@ $feed_items = $stmt->fetchAll();
 
             <div class="col-md-7">
 
-                <div class="card mb-4 shadow-sm">
+                <div class="card mb-4">
                     <div class="card-body d-flex align-items-center bg-white rounded">
-                        <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 40px; height: 40px;">
-                            <i class="fas fa-user text-secondary"></i>
+                        <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-3 text-muted" style="width: 40px; height: 40px;">
+                            <i class="fas fa-pen"></i>
                         </div>
                         <button class="btn btn-light text-start text-muted flex-grow-1 rounded-pill border" type="button" data-bs-toggle="collapse" data-bs-target="#questionForm">
                             O que você quer perguntar?
@@ -113,36 +115,39 @@ $feed_items = $stmt->fetchAll();
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título..." required>
                                 <textarea name="body" class="form-control mb-2" placeholder="Contexto..."></textarea>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm">Perguntar</button>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary btn-sm px-4">Perguntar</button>
+                            </div>
                         </form>
                     </div>
                 </div>
 
                 <?php if(empty($feed_items)): ?>
                     <div class="text-center py-5 text-muted border rounded bg-white">
-                        <i class="fas fa-stream fa-2x mb-3"></i><br>Seu feed está vazio.
+                        <i class="fas fa-coffee fa-2x mb-3"></i><br>
+                        Seu feed está vazio.<br>Entre em mais Sigs!
                     </div>
                 <?php endif; ?>
 
                 <?php foreach($feed_items as $item): ?>
-                <div class="card mb-3 shadow-sm hover-card">
+                <div class="card mb-3 hover-card">
                     <div class="card-body pb-2">
 
-                        <div class="mb-1 text-muted small">
-                            <span class="fw-bold text-dark">Pergunta em </span>
-                            <a href="sig.php?id=<?= $item['sig_id'] ?>" class="text-decoration-none fw-bold text-primary">
+                        <div class="mb-2 text-muted small">
+                            <span class="text-secondary">Pergunta em </span>
+                            <a href="sig.php?id=<?= $item['sig_id'] ?>" class="text-decoration-none fw-bold text-dark">
                                 s/<?= htmlspecialchars($item['sig_name']) ?>
                             </a>
                         </div>
 
                         <h5 class="mb-3">
-                            <a href="question.php?id=<?= $item['question_id'] ?>" class="question-link">
+                            <a href="question.php?id=<?= $item['question_id'] ?>" class="question-link text-dark">
                                 <?= htmlspecialchars($item['question_title']) ?>
                             </a>
                         </h5>
 
-                        <div class="d-flex align-items-center mb-2">
-                            <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 24px; height: 24px; font-size: 0.7rem;">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="bg-secondary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 24px; height: 24px; font-size: 0.7rem;">
                                 <?= strtoupper(substr($item['answer_username'], 0, 1)) ?>
                             </div>
                             <div class="small">
@@ -153,7 +158,7 @@ $feed_items = $stmt->fetchAll();
                             </div>
                         </div>
 
-                        <div class="text-dark mb-3">
+                        <div class="text-dark mb-3" style="line-height: 1.6;">
                             <?php
                                 $body = htmlspecialchars($item['answer_body']);
                                 if (strlen($body) > 250) {
@@ -164,10 +169,10 @@ $feed_items = $stmt->fetchAll();
                             ?>
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                        <div class="d-flex justify-content-between align-items-center border-top pt-2 mt-3">
                             <div class="btn-group bg-light rounded-pill border">
-                                <button class="btn btn-sm text-success fw-bold px-3" disabled>
-                                    <i class="fas fa-arrow-up"></i> <?= $item['answer_votes'] ?>
+                                <button class="btn btn-sm text-secondary fw-bold px-3" disabled>
+                                    <i class="fas fa-arrow-up text-success"></i> <?= $item['answer_votes'] ?>
                                 </button>
                             </div>
 
@@ -184,7 +189,7 @@ $feed_items = $stmt->fetchAll();
 
             <div class="col-md-2 d-none d-lg-block">
                <div class="small text-muted mt-3">
-                   <p>© 2025 Reddora MVP</p>
+                   <p>© 2025 Reddora v1.0</p>
                </div>
             </div>
 
