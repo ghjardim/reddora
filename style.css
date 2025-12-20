@@ -94,3 +94,30 @@ a:hover {
 .thread-line {
     border-left: 2px solid #e9ecef;
 }
+
+/* === BIO DE USUÁRIO === */
+.user-bio {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+    font-weight: 400;
+}
+
+.user-bio-muted {
+    color: #636e72;
+    font-size: 0.9rem;
+}
+
+.btn-edit-bio {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.7);
+    text-decoration: underline;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 10px;
+}
+.btn-edit-bio:hover {
+    color: #fff;
+}

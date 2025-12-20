@@ -1,21 +1,23 @@
 <?php
 require 'db.php';
 
-// CORREÇÃO: Removemos o redirect silencioso. Se der erro, mostra na tela.
+// Verifica ID
 if (!isset($_GET['id'])) {
-    die("<div class='container mt-5 alert alert-danger'>Erro: Nenhum ID de pergunta fornecido na URL. <a href='index.php'>Voltar</a></div>");
+    die("<div class='container mt-5 alert alert-danger'>Erro: Nenhum ID fornecido. <a href='index.php'>Voltar</a></div>");
 }
 $q_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
+// Busca Pergunta
 $stmt = $pdo->prepare("SELECT q.*, s.name as sig_name, u.username FROM questions q JOIN sigs s ON q.sig_id = s.id JOIN users u ON q.user_id = u.id WHERE q.id = ?");
 $stmt->execute([$q_id]);
 $question = $stmt->fetch();
 
 if (!$question) {
-    die("<div class='container mt-5 alert alert-danger'>Erro: Pergunta não encontrada no banco de dados (ID: $q_id). <a href='index.php'>Voltar</a></div>");
+    die("<div class='container mt-5 alert alert-danger'>Erro: Pergunta não encontrada. <a href='index.php'>Voltar</a></div>");
 }
 
+// Busca Respostas e Votos
 $stmt = $pdo->prepare("
     SELECT a.*, u.username, v.vote_type as user_vote
     FROM answers a
@@ -27,9 +29,11 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user_id, $q_id]);
 $all_answers = $stmt->fetchAll();
 
+// Organiza Hierarquia
 $comments_by_parent = [];
 foreach ($all_answers as $ans) { $pid = !empty($ans['parent_id']) ? $ans['parent_id'] : 0; $comments_by_parent[$pid][] = $ans; }
 
+// Função Recursiva para Comentários
 function render_replies($parent_id, $comments_by_parent, $q_id) {
     if (!isset($comments_by_parent[$parent_id])) return;
     foreach ($comments_by_parent[$parent_id] as $ans) {
@@ -40,18 +44,22 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
                 <small class="fw-bold text-dark">
                     <a href="profile.php?id=<?= $ans['user_id'] ?>" class="text-dark text-decoration-none"><?= htmlspecialchars($ans['username']) ?></a>
                 </small>
-                <div class="small text-muted">
+                <div class="small text-muted d-flex align-items-center">
                     <span id="vote-count-<?= $ans_id ?>" class="fw-bold me-2"><?= $ans['votes'] ?> pts</span>
 
                     <button id="btn-up-<?= $ans_id ?>"
                             onclick="vote(<?= $ans_id ?>, 1)"
                             class="btn btn-link p-0 <?= $ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
-                            style="text-decoration:none">▲</button>
+                            style="text-decoration:none; border:none;">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
 
                     <button id="btn-down-<?= $ans_id ?>"
                             onclick="vote(<?= $ans_id ?>, -1)"
-                            class="btn btn-link p-0 ms-1 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
-                            style="text-decoration:none">▼</button>
+                            class="btn btn-link p-0 ms-2 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
+                            style="text-decoration:none; border:none;">
+                        <i class="fas fa-arrow-down"></i>
+                    </button>
                 </div>
             </div>
             <div class="text-dark small mb-2 ps-1"><?= nl2br(htmlspecialchars($ans['body'])) ?></div>
@@ -66,6 +74,7 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
         <?php
     }
 }
+
 function count_children($parent_id, $comments_by_parent) {
     if (!isset($comments_by_parent[$parent_id])) return 0;
     $count = count($comments_by_parent[$parent_id]);
@@ -158,16 +167,20 @@ function count_children($parent_id, $comments_by_parent) {
                                 <div class="mb-3 text-dark"><?= nl2br(htmlspecialchars($root_ans['body'])) ?></div>
 
                                 <div class="d-flex align-items-center">
-                                    <div class="bg-light rounded-pill border px-2">
+                                    <div class="bg-light rounded-pill border px-2 d-flex align-items-center">
                                         <button id="btn-up-<?= $ans_id ?>"
                                                 onclick="vote(<?= $ans_id ?>, 1)"
-                                                class="btn btn-sm <?= $root_ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?> fw-bold border-0">▲</button>
+                                                class="btn btn-sm <?= $root_ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?> fw-bold border-0">
+                                            <i class="fas fa-arrow-up"></i>
+                                        </button>
 
                                         <span id="vote-count-<?= $ans_id ?>" class="fw-bold mx-1 text-dark"><?= $root_ans['votes'] ?></span>
 
                                         <button id="btn-down-<?= $ans_id ?>"
                                                 onclick="vote(<?= $ans_id ?>, -1)"
-                                                class="btn btn-sm <?= $root_ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?> border-0">▼</button>
+                                                class="btn btn-sm <?= $root_ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?> border-0">
+                                            <i class="fas fa-arrow-down"></i>
+                                        </button>
                                     </div>
 
                                     <button class="btn btn-sm text-secondary fw-bold ms-3" onclick="document.getElementById('root-reply-form-<?= $root_ans['id'] ?>').classList.toggle('d-none')">
@@ -211,7 +224,7 @@ function count_children($parent_id, $comments_by_parent) {
         .then(response => response.json())
         .then(data => {
             if(data.status === 'success') {
-                document.getElementById('vote-count-' + ansId).innerText = (data.new_total == null ? 0 : data.new_total);
+                document.getElementById('vote-count-' + ansId).innerText = (data.new_total == null ? 0 : data.new_total) + ' pts';
 
                 let btnUp = document.getElementById('btn-up-' + ansId);
                 let btnDown = document.getElementById('btn-down-' + ansId);
@@ -226,8 +239,11 @@ function count_children($parent_id, $comments_by_parent) {
                 } else {
                     btnUp.classList.add('text-secondary'); btnDown.classList.add('text-secondary');
                 }
+            } else {
+                alert('Erro: ' + data.message);
             }
-        });
+        })
+        .catch(error => console.error('Erro:', error));
     }
     </script>
 </body>
