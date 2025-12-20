@@ -1,7 +1,6 @@
 <?php
 require 'db.php';
 
-// Se não tiver ID na URL, volta para o início
 if (!isset($_GET['id'])) {
     header("Location: index.php");
     exit;
@@ -17,14 +16,15 @@ $sig = $stmt->fetch();
 
 if (!$sig) die("Sig não encontrado.");
 
-// 2. Verifica se o usuário já é membro (para decidir botão Entrar ou Sair)
+// 2. Verifica membro
 $stmt = $pdo->prepare("SELECT 1 FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
 $stmt->execute([$user_id, $sig_id]);
 $is_member = (bool)$stmt->fetch();
 
-// 3. Busca Perguntas DESTE Sig apenas
+// 3. Busca Perguntas e conta quantas respostas cada uma tem
 $stmt = $pdo->prepare("
-    SELECT q.*, u.username
+    SELECT q.*, u.username,
+    (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id) as answer_count
     FROM questions q
     JOIN users u ON q.user_id = u.id
     WHERE q.sig_id = ?
@@ -64,7 +64,6 @@ $questions = $stmt->fetchAll();
                         <h1 class="fw-bold text-primary mb-0">s/<?= htmlspecialchars($sig['name']) ?></h1>
                         <p class="text-muted mt-1 mb-0 fs-5"><?= htmlspecialchars($sig['description']) ?></p>
                     </div>
-
                     <div>
                         <?php if ($is_member): ?>
                             <form action="post_action.php" method="POST">
@@ -96,19 +95,13 @@ $questions = $stmt->fetchAll();
                             <form action="post_action.php" method="POST">
                                 <input type="hidden" name="action" value="create_question">
                                 <input type="hidden" name="sig_id" value="<?= $sig['id'] ?>">
-
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título interessante..." required>
                                 <textarea name="body" class="form-control mb-2" placeholder="Conteúdo do post..." rows="2"></textarea>
-
                                 <div class="text-end">
-                                    <button type="submit" class="btn btn-primary px-4">Postar</button>
+                                    <button type="submit" class="btn btn-primary px-4 rounded-pill">Postar</button>
                                 </div>
                             </form>
                         </div>
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-secondary text-center">
-                        Você precisa entrar nesta comunidade para postar.
                     </div>
                 <?php endif; ?>
 
@@ -117,7 +110,7 @@ $questions = $stmt->fetchAll();
                 <?php if(empty($questions)): ?>
                     <div class="text-center py-5 text-muted border rounded bg-white">
                         <i class="fas fa-wind fa-2x mb-2"></i><br>
-                        Ainda não há discussões aqui.<br>Seja o primeiro a postar!
+                        Ainda não há discussões aqui.
                     </div>
                 <?php endif; ?>
 
@@ -134,19 +127,20 @@ $questions = $stmt->fetchAll();
                             <span><?= date('d/m H:i', strtotime($q['created_at'])) ?></span>
                         </div>
 
-                        <h4 class="card-title">
+                        <h5 class="card-title mb-2">
                             <a href="question.php?id=<?= $q['id'] ?>" class="text-decoration-none text-dark">
                                 <?= htmlspecialchars($q['title']) ?>
                             </a>
-                        </h4>
+                        </h5>
 
-                        <p class="card-text text-secondary">
+                        <p class="card-text text-secondary mb-3">
                             <?= htmlspecialchars(substr($q['body'], 0, 140)) . (strlen($q['body']) > 140 ? '...' : '') ?>
                         </p>
 
-                        <a href="question.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3">
-                            <i class="fas fa-comments"></i> Ver Discussão
+                        <a href="question.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
+                            <i class="far fa-comments me-1"></i> Ver Discussão (<?= $q['answer_count'] ?>)
                         </a>
+
                     </div>
                 </div>
                 <?php endforeach; ?>
