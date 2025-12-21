@@ -41,6 +41,17 @@ $questions = $stmt->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        .read-more-link {
+            cursor: pointer;
+            font-size: 0.9em;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .read-more-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
 
@@ -122,7 +133,12 @@ $questions = $stmt->fetchAll();
                     </div>
                 <?php endif; ?>
 
-                <?php foreach($questions as $q): ?>
+                <?php foreach($questions as $q):
+                    $q_id = $q['id'];
+                    $full_body = $q['body'];
+                    $limit = 200; // Limite de caracteres para preview
+                    $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
+                ?>
                 <div class="card mb-3 hover-card">
                     <div class="card-body">
                         <div class="d-flex justify-content-between text-muted small mb-2">
@@ -141,9 +157,22 @@ $questions = $stmt->fetchAll();
                             </a>
                         </h4>
 
-                        <p class="card-text text-secondary mb-3">
-                            <?= htmlspecialchars(substr($q['body'], 0, 140)) . (strlen($q['body']) > 140 ? '...' : '') ?>
-                        </p>
+                        <div class="card-text text-secondary mb-3">
+                            <?php if ($is_long):
+                                $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
+                            ?>
+                                <span id="short-text-<?= $q_id ?>">
+                                    <?= nl2br(htmlspecialchars($short_body)) ?>
+                                    <a class="read-more-link text-primary" onclick="togglePost(<?= $q_id ?>)">Ler mais</a>
+                                </span>
+                                <span id="full-text-<?= $q_id ?>" class="d-none">
+                                    <?= nl2br(htmlspecialchars($full_body)) ?>
+                                    <a class="read-more-link text-secondary" onclick="togglePost(<?= $q_id ?>)">Ler menos</a>
+                                </span>
+                            <?php else: ?>
+                                <?= nl2br(htmlspecialchars($full_body)) ?>
+                            <?php endif; ?>
+                        </div>
 
                         <a href="question.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
                             <i class="far fa-comments me-1"></i> Ver Discussão (<?= $q['answer_count'] ?>)
@@ -155,5 +184,21 @@ $questions = $stmt->fetchAll();
             </div>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function togglePost(id) {
+        const shortText = document.getElementById('short-text-' + id);
+        const fullText = document.getElementById('full-text-' + id);
+
+        if (shortText.classList.contains('d-none')) {
+            shortText.classList.remove('d-none');
+            fullText.classList.add('d-none');
+        } else {
+            shortText.classList.add('d-none');
+            fullText.classList.remove('d-none');
+        }
+    }
+    </script>
 </body>
 </html>

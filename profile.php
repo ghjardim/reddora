@@ -70,6 +70,17 @@ if ($active_tab === 'all') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        .read-more-link {
+            cursor: pointer;
+            font-size: 0.9em;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .read-more-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
 
@@ -149,7 +160,14 @@ if ($active_tab === 'all') {
                                     </div>
                                 </div>
 
-                            <?php else: $ans = $item['data']; $ans_id = $ans['id']; ?>
+                            <?php else:
+                                // LOGICA DE RESPOSTA NO FEED MISTO
+                                $ans = $item['data'];
+                                $ans_id = $ans['id'];
+                                $full_body = $ans['body'];
+                                $limit = 200;
+                                $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
+                            ?>
                                 <div class="list-group-item py-3 border-0 border-bottom">
                                     <small class="text-muted">
                                         <i class="fas fa-comment"></i> Respondeu em:
@@ -157,9 +175,24 @@ if ($active_tab === 'all') {
                                             <?= htmlspecialchars($ans['question_title']) ?>
                                         </a>
                                     </small>
-                                    <p class="mb-1 mt-2 text-dark">
-                                        <?= nl2br(htmlspecialchars(substr($ans['body'], 0, 200))) . (strlen($ans['body']) > 200 ? '...' : '') ?>
-                                    </p>
+
+                                    <div class="mb-1 mt-2 text-dark">
+                                        <?php if ($is_long):
+                                            $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
+                                        ?>
+                                            <span id="short-text-<?= $ans_id ?>">
+                                                <?= nl2br(htmlspecialchars($short_body)) ?>
+                                                <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
+                                            </span>
+                                            <span id="full-text-<?= $ans_id ?>" class="d-none">
+                                                <?= nl2br(htmlspecialchars($full_body)) ?>
+                                                <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
+                                            </span>
+                                        <?php else: ?>
+                                            <?= nl2br(htmlspecialchars($full_body)) ?>
+                                        <?php endif; ?>
+                                    </div>
+
                                     <div class="d-flex justify-content-between align-items-center mt-2">
                                         <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
 
@@ -212,15 +245,35 @@ if ($active_tab === 'all') {
 
                 <?php if ($active_tab === 'answers'): ?>
                     <div class="list-group shadow-sm">
-                        <?php foreach($answers as $ans): $ans_id = $ans['id']; ?>
+                        <?php foreach($answers as $ans):
+                            $ans_id = $ans['id'];
+                            $full_body = $ans['body'];
+                            $limit = 280; // Limite um pouco maior na aba específica
+                            $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
+                        ?>
                             <div class="list-group-item py-3 border-0 border-bottom">
                                 <small class="text-muted">
                                     <i class="fas fa-comment"></i> Respondeu em:
                                     <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-dark fw-bold text-decoration-none"><?= htmlspecialchars($ans['question_title']) ?></a>
                                 </small>
-                                <p class="mb-1 mt-2 text-dark">
-                                    <?= nl2br(htmlspecialchars($ans['body'])) ?>
-                                </p>
+
+                                <div class="mb-1 mt-2 text-dark">
+                                    <?php if ($is_long):
+                                        $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
+                                    ?>
+                                        <span id="short-text-<?= $ans_id ?>">
+                                            <?= nl2br(htmlspecialchars($short_body)) ?>
+                                            <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
+                                        </span>
+                                        <span id="full-text-<?= $ans_id ?>" class="d-none">
+                                            <?= nl2br(htmlspecialchars($full_body)) ?>
+                                            <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
+                                        </span>
+                                    <?php else: ?>
+                                        <?= nl2br(htmlspecialchars($full_body)) ?>
+                                    <?php endif; ?>
+                                </div>
+
                                 <div class="d-flex justify-content-between align-items-center mt-2">
                                     <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
 
@@ -298,6 +351,19 @@ if ($active_tab === 'all') {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+    function toggleAnswer(id) {
+        const shortText = document.getElementById('short-text-' + id);
+        const fullText = document.getElementById('full-text-' + id);
+
+        if (shortText.classList.contains('d-none')) {
+            shortText.classList.remove('d-none');
+            fullText.classList.add('d-none');
+        } else {
+            shortText.classList.add('d-none');
+            fullText.classList.remove('d-none');
+        }
+    }
+
     function vote(ansId, val) {
         let formData = new FormData();
         formData.append('action', 'vote_ajax');
