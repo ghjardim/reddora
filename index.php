@@ -81,7 +81,7 @@ $feed_items = $stmt->fetchAll();
                     <div class="list-group list-group-flush">
                         <?php foreach($my_sigs as $sig): ?>
                             <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0">
-                                <span class="fw-bold" style="color: var(--reddora-dark)">s/<?= htmlspecialchars($sig['name']) ?></span>
+                                <span class="fw-bold" style="color: var(--reddora-dark)"><?= htmlspecialchars($sig['name']) ?></span>
                             </a>
                         <?php endforeach; ?>
                         <?php if(empty($my_sigs)): ?>
@@ -113,7 +113,7 @@ $feed_items = $stmt->fetchAll();
                                 <select name="sig_id" class="form-select form-select-sm mb-2" required>
                                     <option value="" disabled selected>Escolha a Comunidade...</option>
                                     <?php foreach($my_sigs as $sig): ?>
-                                        <option value="<?= $sig['id'] ?>">s/<?= htmlspecialchars($sig['name']) ?></option>
+                                        <option value="<?= $sig['id'] ?>"><?= htmlspecialchars($sig['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título..." required>
@@ -129,8 +129,7 @@ $feed_items = $stmt->fetchAll();
                 <?php foreach($feed_items as $item):
                     $ans_id = $item['answer_id'];
                     $full_body = $item['answer_body'];
-                    $limit = 280; // Limite de caracteres
-                    // mb_strlen conta caracteres reais (UTF-8), não bytes
+                    $limit = 280;
                     $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
                 ?>
                 <div class="card mb-3 hover-card">
@@ -138,7 +137,7 @@ $feed_items = $stmt->fetchAll();
                         <div class="mb-2 text-muted small">
                             <span class="text-secondary">Pergunta em </span>
                             <a href="sig.php?id=<?= $item['sig_id'] ?>" class="text-decoration-none fw-bold text-dark" style="position: relative; z-index: 2;">
-                                s/<?= htmlspecialchars($item['sig_name']) ?>
+                                <?= htmlspecialchars($item['sig_name']) ?>
                             </a>
                         </div>
 
@@ -162,7 +161,6 @@ $feed_items = $stmt->fetchAll();
 
                         <div class="text-dark mb-3" style="line-height: 1.6;">
                             <?php if ($is_long):
-                                // mb_substr corta corretamente strings UTF-8
                                 $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
                             ?>
                                 <span id="short-text-<?= $ans_id ?>">
@@ -217,7 +215,6 @@ $feed_items = $stmt->fetchAll();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    // Função para expandir/recolher o texto
     function toggleAnswer(id) {
         const shortText = document.getElementById('short-text-' + id);
         const fullText = document.getElementById('full-text-' + id);

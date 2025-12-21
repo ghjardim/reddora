@@ -155,7 +155,7 @@ if ($active_tab === 'all') {
                                     <div class="mt-2 text-muted small">
                                         <i class="fas fa-question-circle"></i> Perguntou em
                                         <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none fw-bold" style="color: var(--reddora-dark);">
-                                            s/<?= htmlspecialchars($q['sig_name']) ?>
+                                            <?= htmlspecialchars($q['sig_name']) ?>
                                         </a>
                                     </div>
                                 </div>
@@ -234,7 +234,7 @@ if ($active_tab === 'all') {
                                 <div class="mt-2 text-muted small">
                                     <i class="fas fa-question-circle"></i> Perguntou em
                                     <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none fw-bold" style="color: var(--reddora-dark);">
-                                        s/<?= htmlspecialchars($q['sig_name']) ?>
+                                        <?= htmlspecialchars($q['sig_name']) ?>
                                     </a>
                                 </div>
                             </div>
@@ -332,7 +332,7 @@ if ($active_tab === 'all') {
                     <div class="list-group list-group-flush">
                         <?php foreach($user_sigs as $sig): ?>
                             <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0">
-                                <span class="fw-bold" style="color: var(--reddora-dark);">s/<?= htmlspecialchars($sig['name']) ?></span>
+                                <span class="fw-bold" style="color: var(--reddora-dark);"><?= htmlspecialchars($sig['name']) ?></span>
                             </a>
                         <?php endforeach; ?>
 

@@ -56,7 +56,7 @@ $my_memberships = $stmt->fetchAll(PDO::FETCH_COLUMN);
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title fw-bold">
                                 <a href="sig.php?id=<?= $sig['id'] ?>" class="text-dark text-decoration-none">
-                                    s/<?= htmlspecialchars($sig['name']) ?>
+                                    <?= htmlspecialchars($sig['name']) ?>
                                 </a>
                             </h5>
                             <p class="card-text text-muted small flex-grow-1">

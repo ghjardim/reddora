@@ -73,7 +73,7 @@ $questions = $stmt->fetchAll();
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="fw-bold text-dark mb-0">s/<?= htmlspecialchars($sig['name']) ?></h1>
+                        <h1 class="fw-bold text-dark mb-0"><?= htmlspecialchars($sig['name']) ?></h1>
                         <p class="text-muted mt-1 mb-0 fs-5"><?= htmlspecialchars($sig['description']) ?></p>
                     </div>
 
@@ -104,7 +104,7 @@ $questions = $stmt->fetchAll();
                 <?php if($is_member): ?>
                     <div class="card mb-4 shadow-sm border-0">
                         <div class="card-body bg-white rounded">
-                            <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">Criar post em s/<?= htmlspecialchars($sig['name']) ?></h6>
+                            <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">Criar post em <?= htmlspecialchars($sig['name']) ?></h6>
                             <form action="post_action.php" method="POST">
                                 <input type="hidden" name="action" value="create_question">
                                 <input type="hidden" name="sig_id" value="<?= $sig['id'] ?>">

@@ -100,7 +100,7 @@ function count_children($parent_id, $comments_by_parent) {
                 <div class="card main-question-card border-0 mb-5">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center mb-3">
-                            <a href="sig.php?id=<?= $question['sig_id'] ?>" class="badge bg-light text-dark border text-decoration-none me-2">s/<?= htmlspecialchars($question['sig_name']) ?></a>
+                            <a href="sig.php?id=<?= $question['sig_id'] ?>" class="badge bg-light text-dark border text-decoration-none me-2"><?= htmlspecialchars($question['sig_name']) ?></a>
                             <span class="text-muted small">u/<?= htmlspecialchars($question['username']) ?> &bull; <?= date('d/m/Y', strtotime($question['created_at'])) ?></span>
                         </div>
                         <h1 class="fw-bold mb-4 text-dark" style="font-size:1.75rem;"><?= htmlspecialchars($question['title']) ?></h1>
