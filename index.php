@@ -8,7 +8,7 @@ $stmt = $pdo->prepare("SELECT s.* FROM sigs s JOIN sig_memberships m ON s.id = m
 $stmt->execute([$user_id]);
 $my_sigs = $stmt->fetchAll();
 
-// 2. Feed
+// 2. Feed - AGORA FILTRANDO APENAS RESPOSTAS DE NÍVEL SUPERIOR (parent_id IS NULL)
 $stmt = $pdo->prepare("
     SELECT
         a.id as answer_id,
@@ -29,6 +29,7 @@ $stmt = $pdo->prepare("
     JOIN sig_memberships m ON s.id = m.sig_id
     LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ?
     WHERE m.user_id = ?
+    AND a.parent_id IS NULL  -- <--- FILTRO DE HIERARQUIA
     ORDER BY a.created_at DESC
     LIMIT 50
 ");
@@ -44,15 +45,8 @@ $feed_items = $stmt->fetchAll();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <style>
-        .read-more-link {
-            cursor: pointer;
-            font-size: 0.9em;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .read-more-link:hover {
-            text-decoration: underline;
-        }
+        .read-more-link { cursor: pointer; font-size: 0.9em; text-decoration: none; font-weight: bold; }
+        .read-more-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -179,21 +173,13 @@ $feed_items = $stmt->fetchAll();
 
                         <div class="d-flex justify-content-between align-items-center border-top pt-2 mt-3">
                             <div class="btn-group bg-light rounded-pill border">
-                                <button id="btn-up-<?= $ans_id ?>"
-                                        onclick="vote(<?= $ans_id ?>, 1)"
-                                        class="btn btn-sm px-3 fw-bold <?= $item['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
-                                        style="border:none; z-index: 5;">
+                                <button id="btn-up-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, 1)" class="btn btn-sm px-3 fw-bold <?= $item['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>" style="border:none; z-index: 5;">
                                     <i class="fas fa-arrow-up"></i>
                                 </button>
-
                                 <span id="vote-count-<?= $ans_id ?>" class="btn btn-sm px-2 text-dark fw-bold" style="background:transparent; border:none; cursor:default;">
                                     <?= $item['answer_votes'] ?>
                                 </span>
-
-                                <button id="btn-down-<?= $ans_id ?>"
-                                        onclick="vote(<?= $ans_id ?>, -1)"
-                                        class="btn btn-sm px-3 fw-bold <?= $item['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
-                                        style="border:none; z-index: 5;">
+                                <button id="btn-down-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, -1)" class="btn btn-sm px-3 fw-bold <?= $item['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>" style="border:none; z-index: 5;">
                                     <i class="fas fa-arrow-down"></i>
                                 </button>
                             </div>
@@ -218,13 +204,10 @@ $feed_items = $stmt->fetchAll();
     function toggleAnswer(id) {
         const shortText = document.getElementById('short-text-' + id);
         const fullText = document.getElementById('full-text-' + id);
-
         if (shortText.classList.contains('d-none')) {
-            shortText.classList.remove('d-none');
-            fullText.classList.add('d-none');
+            shortText.classList.remove('d-none'); fullText.classList.add('d-none');
         } else {
-            shortText.classList.add('d-none');
-            fullText.classList.remove('d-none');
+            shortText.classList.add('d-none'); fullText.classList.remove('d-none');
         }
     }
 
@@ -239,23 +222,14 @@ $feed_items = $stmt->fetchAll();
         .then(data => {
             if(data.status === 'success') {
                 document.getElementById('vote-count-' + ansId).innerText = data.new_total;
-
                 let btnUp = document.getElementById('btn-up-' + ansId);
                 let btnDown = document.getElementById('btn-down-' + ansId);
-
                 btnUp.classList.remove('text-success', 'text-secondary');
                 btnDown.classList.remove('text-danger', 'text-secondary');
-
-                if (data.user_vote == 1) {
-                    btnUp.classList.add('text-success'); btnDown.classList.add('text-secondary');
-                } else if (data.user_vote == -1) {
-                    btnUp.classList.add('text-secondary'); btnDown.classList.add('text-danger');
-                } else {
-                    btnUp.classList.add('text-secondary'); btnDown.classList.add('text-secondary');
-                }
-            } else {
-                alert('Erro: ' + data.message);
-            }
+                if (data.user_vote == 1) { btnUp.classList.add('text-success'); btnDown.classList.add('text-secondary'); }
+                else if (data.user_vote == -1) { btnUp.classList.add('text-secondary'); btnDown.classList.add('text-danger'); }
+                else { btnUp.classList.add('text-secondary'); btnDown.classList.add('text-secondary'); }
+            } else { alert('Erro: ' + data.message); }
         })
         .catch(error => console.error('Erro:', error));
     }
