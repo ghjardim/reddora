@@ -33,42 +33,59 @@ $all_answers = $stmt->fetchAll();
 $comments_by_parent = [];
 foreach ($all_answers as $ans) { $pid = !empty($ans['parent_id']) ? $ans['parent_id'] : 0; $comments_by_parent[$pid][] = $ans; }
 
-// Função Recursiva para Comentários
+// Função Recursiva para Comentários (Visual Limpo)
 function render_replies($parent_id, $comments_by_parent, $q_id) {
     if (!isset($comments_by_parent[$parent_id])) return;
     foreach ($comments_by_parent[$parent_id] as $ans) {
         $ans_id = $ans['id'];
         ?>
         <div class="mt-3 ps-3 thread-line">
-            <div class="bg-white p-2 rounded mb-1 d-flex justify-content-between border">
-                <small class="fw-bold text-dark">
-                    <a href="profile.php?id=<?= $ans['user_id'] ?>" class="text-dark text-decoration-none"><?= htmlspecialchars($ans['username']) ?></a>
-                </small>
-                <div class="small text-muted d-flex align-items-center">
-                    <span id="vote-count-<?= $ans_id ?>" class="fw-bold me-2"><?= $ans['votes'] ?> pts</span>
 
+            <div class="mb-1 d-flex align-items-center">
+                <a href="profile.php?id=<?= $ans['user_id'] ?>" class="fw-bold text-dark text-decoration-none small">
+                    <?= htmlspecialchars($ans['username']) ?>
+                </a>
+                </div>
+
+            <div class="text-dark small mb-2" style="line-height: 1.5;">
+                <?= nl2br(htmlspecialchars($ans['body'])) ?>
+            </div>
+
+            <div class="d-flex align-items-center mb-2">
+
+                <div class="bg-light rounded-pill border px-2 d-flex align-items-center me-2" style="transform: scale(0.9); transform-origin: left center;">
                     <button id="btn-up-<?= $ans_id ?>"
                             onclick="vote(<?= $ans_id ?>, 1)"
-                            class="btn btn-link p-0 <?= $ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
+                            class="btn btn-sm btn-link p-0 <?= $ans['user_vote'] == 1 ? 'text-success' : 'text-secondary' ?>"
                             style="text-decoration:none; border:none;">
                         <i class="fas fa-arrow-up"></i>
                     </button>
 
+                    <span id="vote-count-<?= $ans_id ?>" class="fw-bold mx-2 text-dark small"><?= $ans['votes'] ?></span>
+
                     <button id="btn-down-<?= $ans_id ?>"
                             onclick="vote(<?= $ans_id ?>, -1)"
-                            class="btn btn-link p-0 ms-2 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
+                            class="btn btn-sm btn-link p-0 <?= $ans['user_vote'] == -1 ? 'text-danger' : 'text-secondary' ?>"
                             style="text-decoration:none; border:none;">
                         <i class="fas fa-arrow-down"></i>
                     </button>
                 </div>
-            </div>
-            <div class="text-dark small mb-2 ps-1"><?= nl2br(htmlspecialchars($ans['body'])) ?></div>
 
-            <button class="btn btn-sm btn-link text-decoration-none p-0 ps-1 small text-primary fw-bold" onclick="document.getElementById('reply-form-<?= $ans['id'] ?>').classList.toggle('d-none')">Responder</button>
-
-            <div id="reply-form-<?= $ans['id'] ?>" class="d-none ms-2 mt-2">
-                <form action="post_action.php" method="POST"><input type="hidden" name="action" value="answer"><input type="hidden" name="question_id" value="<?= $q_id ?>"><input type="hidden" name="parent_id" value="<?= $ans['id'] ?>"><textarea name="body" class="form-control form-control-sm mb-1" rows="2"></textarea><button class="btn btn-primary btn-sm py-0">Enviar</button></form>
+                <button class="btn btn-sm text-muted fw-bold p-0 small" onclick="document.getElementById('reply-form-<?= $ans['id'] ?>').classList.toggle('d-none')">
+                    Responder
+                </button>
             </div>
+
+            <div id="reply-form-<?= $ans['id'] ?>" class="d-none ms-1 mt-2 mb-3">
+                <form action="post_action.php" method="POST">
+                    <input type="hidden" name="action" value="answer">
+                    <input type="hidden" name="question_id" value="<?= $q_id ?>">
+                    <input type="hidden" name="parent_id" value="<?= $ans['id'] ?>">
+                    <textarea name="body" class="form-control form-control-sm mb-1" rows="2" placeholder="Sua resposta..."></textarea>
+                    <button class="btn btn-primary btn-sm py-0 px-3">Enviar</button>
+                </form>
+            </div>
+
             <?php render_replies($ans['id'], $comments_by_parent, $q_id); ?>
         </div>
         <?php
@@ -90,6 +107,24 @@ function count_children($parent_id, $comments_by_parent) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        .question-body {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #2c3e50;
+        }
+        .main-question-card {
+            border-top: 5px solid var(--reddora-red);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        /* Ajuste fino para a linha da thread ficar elegante */
+        .thread-line {
+            border-left: 2px solid #e9ecef;
+        }
+        .thread-line:hover {
+            border-left-color: #ced4da; /* Fica mais escuro ao passar o mouse na área */
+        }
+    </style>
 </head>
 <body>
 
@@ -107,33 +142,36 @@ function count_children($parent_id, $comments_by_parent) {
         <div class="row">
             <div class="col-md-8 mx-auto">
 
-                <div class="mb-2">
-                    <a href="sig.php?id=<?= $question['sig_id'] ?>" class="fw-bold text-uppercase small text-decoration-none" style="color: var(--reddora-dark);">
-                        s/<?= htmlspecialchars($question['sig_name']) ?>
-                    </a>
-                </div>
+                <div class="card main-question-card border-0 mb-5">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center">
+                                <a href="sig.php?id=<?= $question['sig_id'] ?>" class="badge bg-light text-dark border text-decoration-none me-2">
+                                    s/<?= htmlspecialchars($question['sig_name']) ?>
+                                </a>
+                                <span class="text-muted small">
+                                    u/<a href="profile.php?id=<?= $question['user_id'] ?>" class="text-decoration-none fw-bold text-dark"><?= htmlspecialchars($question['username']) ?></a>
+                                    &bull; <?= date('d/m/Y', strtotime($question['created_at'])) ?>
+                                </span>
+                            </div>
+                        </div>
 
-                <h1 class="h3 fw-bold mb-3"><?= htmlspecialchars($question['title']) ?></h1>
+                        <h1 class="fw-bold mb-4 text-dark" style="font-size: 1.75rem;"><?= htmlspecialchars($question['title']) ?></h1>
 
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-secondary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 32px; height: 32px; font-size: 0.8rem;">
-                        <?= strtoupper(substr($question['username'], 0, 1)) ?>
+                        <div class="question-body mb-4">
+                            <?= nl2br(htmlspecialchars($question['body'])) ?>
+                        </div>
                     </div>
-                    <div class="small">
-                        <a href="profile.php?id=<?= $question['user_id'] ?>" class="fw-bold text-dark text-decoration-none"><?= htmlspecialchars($question['username']) ?></a>
-                        <span class="text-muted mx-1">&bull;</span>
-                        <span class="text-muted"><?= date('d/m/Y', strtotime($question['created_at'])) ?></span>
-                    </div>
                 </div>
 
-                <div class="fs-5 text-dark mb-4" style="line-height: 1.7;">
-                    <?= nl2br(htmlspecialchars($question['body'])) ?>
-                </div>
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                    <h5 class="text-muted fw-bold text-uppercase small mb-0">
+                        <i class="far fa-comments"></i>
+                        <?= isset($comments_by_parent[0]) ? count($comments_by_parent[0]) : 0 ?> Respostas Principais
+                    </h5>
 
-                <div class="d-flex justify-content-between align-items-center border-top border-bottom py-3 mb-4">
-                    <div class="fw-bold text-secondary"><?= isset($comments_by_parent[0]) ? count($comments_by_parent[0]) : 0 ?> Respostas</div>
-                    <button class="btn btn-primary rounded-pill px-4 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#mainReplyForm">
-                        <i class="fas fa-pen"></i> Responder
+                    <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#mainReplyForm">
+                        <i class="fas fa-pen me-2"></i>Escrever resposta
                     </button>
                 </div>
 
@@ -142,8 +180,11 @@ function count_children($parent_id, $comments_by_parent) {
                         <form action="post_action.php" method="POST">
                             <input type="hidden" name="action" value="answer">
                             <input type="hidden" name="question_id" value="<?= $q_id ?>">
-                            <textarea name="body" class="form-control mb-2" rows="3" placeholder="Sua resposta..."></textarea>
-                            <button type="submit" class="btn btn-primary btn-sm float-end">Postar</button>
+                            <label class="form-label small fw-bold text-muted">Sua resposta</label>
+                            <textarea name="body" class="form-control mb-2" rows="4" placeholder="Adicione à discussão..."></textarea>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary px-4 fw-bold">Postar</button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -167,6 +208,7 @@ function count_children($parent_id, $comments_by_parent) {
                                 <div class="mb-3 text-dark"><?= nl2br(htmlspecialchars($root_ans['body'])) ?></div>
 
                                 <div class="d-flex align-items-center">
+
                                     <div class="bg-light rounded-pill border px-2 d-flex align-items-center">
                                         <button id="btn-up-<?= $ans_id ?>"
                                                 onclick="vote(<?= $ans_id ?>, 1)"
@@ -189,7 +231,13 @@ function count_children($parent_id, $comments_by_parent) {
                                 </div>
 
                                 <div id="root-reply-form-<?= $root_ans['id'] ?>" class="d-none mt-3 p-3 bg-light rounded">
-                                    <form action="post_action.php" method="POST"><input type="hidden" name="action" value="answer"><input type="hidden" name="question_id" value="<?= $q_id ?>"><input type="hidden" name="parent_id" value="<?= $root_ans['id'] ?>"><textarea name="body" class="form-control mb-2" rows="2"></textarea><button type="submit" class="btn btn-primary btn-sm">Enviar</button></form>
+                                    <form action="post_action.php" method="POST">
+                                        <input type="hidden" name="action" value="answer">
+                                        <input type="hidden" name="question_id" value="<?= $q_id ?>">
+                                        <input type="hidden" name="parent_id" value="<?= $root_ans['id'] ?>">
+                                        <textarea name="body" class="form-control mb-2" rows="2"></textarea>
+                                        <button type="submit" class="btn btn-primary btn-sm">Enviar</button>
+                                    </form>
                                 </div>
 
                                 <?php $reply_count = count_children($root_ans['id'], $comments_by_parent); if ($reply_count > 0): ?>
@@ -197,8 +245,7 @@ function count_children($parent_id, $comments_by_parent) {
                                         <button class="btn btn-light btn-sm w-100 text-start fw-bold text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#thread-<?= $root_ans['id'] ?>">
                                             <i class="fas fa-level-down-alt me-2"></i> Ver <?= $reply_count ?> respostas
                                         </button>
-                                        <div class="collapse" id="thread-<?= $root_ans['id'] ?>">
-                                            <div class="ps-2 pt-2">
+                                        <div class="collapse show" id="thread-<?= $root_ans['id'] ?>"> <div class="ps-2 pt-2">
                                                 <?php render_replies($root_ans['id'], $comments_by_parent, $q_id); ?>
                                             </div>
                                         </div>
@@ -224,7 +271,7 @@ function count_children($parent_id, $comments_by_parent) {
         .then(response => response.json())
         .then(data => {
             if(data.status === 'success') {
-                document.getElementById('vote-count-' + ansId).innerText = (data.new_total == null ? 0 : data.new_total) + ' pts';
+                document.getElementById('vote-count-' + ansId).innerText = (data.new_total == null ? 0 : data.new_total);
 
                 let btnUp = document.getElementById('btn-up-' + ansId);
                 let btnDown = document.getElementById('btn-down-' + ansId);
