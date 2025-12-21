@@ -43,6 +43,17 @@ $feed_items = $stmt->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        .read-more-link {
+            cursor: pointer;
+            font-size: 0.9em;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .read-more-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
 
@@ -117,6 +128,10 @@ $feed_items = $stmt->fetchAll();
 
                 <?php foreach($feed_items as $item):
                     $ans_id = $item['answer_id'];
+                    $full_body = $item['answer_body'];
+                    $limit = 280; // Limite de caracteres
+                    // mb_strlen conta caracteres reais (UTF-8), não bytes
+                    $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
                 ?>
                 <div class="card mb-3 hover-card">
                     <div class="card-body pb-2">
@@ -144,8 +159,24 @@ $feed_items = $stmt->fetchAll();
                                 <span class="text-muted">respondeu:</span>
                             </div>
                         </div>
+
                         <div class="text-dark mb-3" style="line-height: 1.6;">
-                            <?= nl2br(htmlspecialchars(strlen($item['answer_body']) > 250 ? substr($item['answer_body'], 0, 250)."..." : $item['answer_body'])) ?>
+                            <?php if ($is_long):
+                                // mb_substr corta corretamente strings UTF-8
+                                $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
+                            ?>
+                                <span id="short-text-<?= $ans_id ?>">
+                                    <?= nl2br(htmlspecialchars($short_body)) ?>
+                                    <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
+                                </span>
+
+                                <span id="full-text-<?= $ans_id ?>" class="d-none">
+                                    <?= nl2br(htmlspecialchars($full_body)) ?>
+                                    <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
+                                </span>
+                            <?php else: ?>
+                                <?= nl2br(htmlspecialchars($full_body)) ?>
+                            <?php endif; ?>
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center border-top pt-2 mt-3">
@@ -186,6 +217,20 @@ $feed_items = $stmt->fetchAll();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+    // Função para expandir/recolher o texto
+    function toggleAnswer(id) {
+        const shortText = document.getElementById('short-text-' + id);
+        const fullText = document.getElementById('full-text-' + id);
+
+        if (shortText.classList.contains('d-none')) {
+            shortText.classList.remove('d-none');
+            fullText.classList.add('d-none');
+        } else {
+            shortText.classList.add('d-none');
+            fullText.classList.remove('d-none');
+        }
+    }
+
     function vote(ansId, val) {
         let formData = new FormData();
         formData.append('action', 'vote_ajax');
