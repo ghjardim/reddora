@@ -163,6 +163,7 @@ $feed_items = $stmt->fetchAll();
                                     <i class="fas fa-users text-muted me-1"></i> s/<?= htmlspecialchars($item['sig_name']) ?>
                                 </a>
                             </div>
+
                             <div class="d-flex align-items-center mb-2">
                                 <div class="bg-secondary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 24px; height: 24px; font-size: 0.7rem;"><?= strtoupper(substr($item['answer_username'], 0, 1)) ?></div>
                                 <span class="fw-bold small">u/<?= htmlspecialchars($item['answer_username']) ?></span>

@@ -40,6 +40,17 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$sig_id]);
 $questions = $stmt->fetchAll();
+
+// 4. Busca Membros do SIG
+$stmt = $pdo->prepare("
+    SELECT u.id, u.username, u.bio
+    FROM users u
+    JOIN sig_memberships m ON u.id = m.user_id
+    WHERE m.sig_id = ?
+    ORDER BY u.username ASC
+");
+$stmt->execute([$sig_id]);
+$members = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -116,7 +127,7 @@ $questions = $stmt->fetchAll();
         </div>
 
         <div class="row">
-            <div class="col-md-8 mx-auto">
+            <div class="col-lg-8">
 
                 <?php if($is_member): ?>
                     <div class="card mb-4 shadow-sm border-0">
@@ -203,6 +214,38 @@ $questions = $stmt->fetchAll();
                 <?php endforeach; ?>
 
             </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 mb-4 bg-white sticky-top" style="top: 90px; z-index: 1;">
+                    <div class="card-header bg-white fw-bold text-uppercase small text-muted d-flex justify-content-between align-items-center border-bottom-0 pt-3 pb-2">
+                        <span>Membros</span>
+                        <span class="badge bg-light text-dark border rounded-pill"><?= count($members) ?></span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <?php foreach($members as $member): ?>
+                            <a href="profile.php?id=<?= $member['id'] ?>" class="list-group-item list-group-item-action d-flex align-items-center border-0 py-2">
+                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px; color: var(--reddora-dark); font-weight: bold; font-size: 0.9rem;">
+                                    <?= strtoupper(substr($member['username'], 0, 1)) ?>
+                                </div>
+                                <div class="text-truncate">
+                                    <h6 class="mb-0 fw-bold text-dark text-truncate" style="font-size: 0.95rem;">
+                                        <?= htmlspecialchars($member['username']) ?>
+                                    </h6>
+                                    <?php if(!empty($member['bio'])): ?>
+                                        <small class="text-muted text-truncate d-block" style="font-size: 0.8rem;">
+                                            <?= htmlspecialchars($member['bio']) ?>
+                                        </small>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                        <?php if(empty($members)): ?>
+                            <div class="list-group-item text-muted small py-3 border-0 fst-italic text-center">Nenhum membro encontrado.</div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
