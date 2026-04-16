@@ -3,12 +3,21 @@ require 'db.php';
 
 $user_id = $_SESSION['user_id'];
 
+// Função para renderizar as badges de tipo
+function getPostBadge($type) {
+    switch($type) {
+        case 'post': return '<span class="badge bg-success text-white border me-1"><i class="fas fa-file-alt"></i> Ensaio</span>';
+        case 'short': return '<span class="badge bg-warning text-dark border me-1"><i class="fas fa-bolt"></i> Curto</span>';
+        default: return '<span class="badge bg-primary text-white border me-1"><i class="fas fa-question-circle"></i> Pergunta</span>';
+    }
+}
+
 // 1. Sidebar Sigs
 $stmt = $pdo->prepare("SELECT s.* FROM sigs s JOIN sig_memberships m ON s.id = m.sig_id WHERE m.user_id = ? ORDER BY s.name ASC");
 $stmt->execute([$user_id]);
 $my_sigs = $stmt->fetchAll();
 
-// 2. Feed - AGORA FILTRANDO APENAS RESPOSTAS DE NÍVEL SUPERIOR (parent_id IS NULL)
+// 2. Feed - FILTRANDO APENAS RESPOSTAS DE NÍVEL SUPERIOR (parent_id IS NULL)
 $stmt = $pdo->prepare("
     SELECT
         a.id as answer_id,
@@ -19,6 +28,7 @@ $stmt = $pdo->prepare("
         u.username as answer_username,
         q.id as question_id,
         q.title as question_title,
+        q.post_type,
         s.id as sig_id,
         s.name as sig_name,
         v.vote_type as user_vote
@@ -29,7 +39,7 @@ $stmt = $pdo->prepare("
     JOIN sig_memberships m ON s.id = m.sig_id
     LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ?
     WHERE m.user_id = ?
-    AND a.parent_id IS NULL  -- <--- FILTRO DE HIERARQUIA
+    AND a.parent_id IS NULL
     ORDER BY a.created_at DESC
     LIMIT 50
 ");
@@ -71,7 +81,7 @@ $feed_items = $stmt->fetchAll();
 
             <div class="col-md-3 d-none d-md-block">
                 <div class="card shadow-sm mb-3 sticky-top" style="top: 90px; z-index: 1;">
-                    <div class="card-header bg-white fw-bold text-uppercase small text-muted">Seus Sigs</div>
+                    <div class="card-header bg-white fw-bold text-uppercase small text-muted">Os teus Sigs</div>
                     <div class="list-group list-group-flush">
                         <?php foreach($my_sigs as $sig): ?>
                             <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0">
@@ -79,7 +89,7 @@ $feed_items = $stmt->fetchAll();
                             </a>
                         <?php endforeach; ?>
                         <?php if(empty($my_sigs)): ?>
-                            <div class="list-group-item text-muted small">Você não segue nada.</div>
+                            <div class="list-group-item text-muted small">Não segues nenhuma comunidade.</div>
                         <?php endif; ?>
                     </div>
                     <div class="card-footer bg-white p-3">
@@ -97,24 +107,30 @@ $feed_items = $stmt->fetchAll();
                             <i class="fas fa-pen"></i>
                         </div>
                         <button class="btn btn-light text-start text-muted flex-grow-1 rounded-pill border" type="button" data-bs-toggle="collapse" data-bs-target="#questionForm">
-                            O que você quer perguntar?
+                            O que pretendes partilhar?
                         </button>
                     </div>
                     <div class="collapse p-3 border-top" id="questionForm">
                         <form action="post_action.php" method="POST">
                             <input type="hidden" name="action" value="create_question">
+                            <input type="hidden" name="redirect" value="index.php">
                             <div class="mb-2">
                                 <select name="sig_id" class="form-select form-select-sm mb-2" required>
-                                    <option value="" disabled selected>Escolha a Comunidade...</option>
+                                    <option value="" disabled selected>Escolhe a Comunidade...</option>
                                     <?php foreach($my_sigs as $sig): ?>
                                         <option value="<?= $sig['id'] ?>"><?= htmlspecialchars($sig['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                                <select name="post_type" class="form-select form-select-sm mb-2" required>
+                                    <option value="question">❓ Pergunta (Tenho uma dúvida)</option>
+                                    <option value="post">📝 Ensaio / Post (Quero partilhar uma tese/análise)</option>
+                                    <option value="short">⚡ Curto (Apenas um pensamento rápido)</option>
+                                </select>
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título..." required>
-                                <textarea name="body" class="form-control mb-2" placeholder="Contexto..."></textarea>
+                                <textarea name="body" class="form-control mb-2" placeholder="Contexto ou conteúdo..."></textarea>
                             </div>
                             <div class="text-end">
-                                <button type="submit" class="btn btn-primary btn-sm px-4">Perguntar</button>
+                                <button type="submit" class="btn btn-primary btn-sm px-4">Publicar</button>
                             </div>
                         </form>
                     </div>
@@ -128,8 +144,9 @@ $feed_items = $stmt->fetchAll();
                 ?>
                 <div class="card mb-3 hover-card">
                     <div class="card-body pb-2">
-                        <div class="mb-2 text-muted small">
-                            <span class="text-secondary">Pergunta em </span>
+                        <div class="mb-2 text-muted small d-flex align-items-center">
+                            <?= getPostBadge($item['post_type']) ?>
+                            <span class="text-secondary mx-1">em</span>
                             <a href="sig.php?id=<?= $item['sig_id'] ?>" class="text-decoration-none fw-bold text-dark" style="position: relative; z-index: 2;">
                                 <?= htmlspecialchars($item['sig_name']) ?>
                             </a>
