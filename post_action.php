@@ -4,7 +4,7 @@ require 'db.php';
 
 $action = $_POST['action'] ?? '';
 
-// === VOTAÇÃO DE KARMA (QUALIDADE) ===
+// === VOTAÇÃO DE KARMA (QUALIDADE NAS RESPOSTAS) ===
 if ($action === 'vote_ajax') {
     header('Content-Type: application/json');
     if (!isset($_SESSION['user_id'])) { echo json_encode(['status' => 'error', 'message' => 'Login necessário']); exit; }
@@ -43,7 +43,7 @@ if ($action === 'vote_ajax') {
     exit;
 }
 
-// === CONCORDÂNCIA VIA AJAX ===
+// === CONCORDÂNCIA VIA AJAX (NAS RESPOSTAS) ===
 elseif ($action === 'agreement_ajax') {
     header('Content-Type: application/json');
     if (!isset($_SESSION['user_id'])) { echo json_encode(['status' => 'error', 'message' => 'Login necessário']); exit; }
@@ -76,6 +76,84 @@ elseif ($action === 'agreement_ajax') {
 
     $stmt = $pdo->prepare("SELECT agreement FROM answers WHERE id = ?");
     $stmt->execute([$ans_id]);
+    $new_total = $stmt->fetchColumn();
+
+    echo json_encode(['status' => 'success', 'new_total' => $new_total, 'user_agreement' => $new_user_agreement]);
+    exit;
+}
+
+// === VOTAÇÃO DE KARMA NO POST PRINCIPAL (PERGUNTA) ===
+elseif ($action === 'vote_question_ajax') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) { echo json_encode(['status' => 'error', 'message' => 'Login necessário']); exit; }
+
+    $user_id = $_SESSION['user_id'];
+    $q_id = (int)$_POST['q_id'];
+    $val = (int)$_POST['val'];
+
+    $stmt = $pdo->prepare("SELECT vote_type FROM question_votes WHERE user_id = ? AND question_id = ?");
+    $stmt->execute([$user_id, $q_id]);
+    $existing = $stmt->fetch();
+    $new_user_vote = 0;
+
+    if ($existing) {
+        $old_val = (int)$existing['vote_type'];
+        if ($old_val === $val) {
+            $pdo->prepare("DELETE FROM question_votes WHERE user_id = ? AND question_id = ?")->execute([$user_id, $q_id]);
+            $pdo->prepare("UPDATE questions SET votes = votes - ? WHERE id = ?")->execute([$old_val, $q_id]);
+        } else {
+            $pdo->prepare("UPDATE question_votes SET vote_type = ? WHERE user_id = ? AND question_id = ?")->execute([$val, $user_id, $q_id]);
+            $diff = $val - $old_val;
+            $pdo->prepare("UPDATE questions SET votes = votes + ? WHERE id = ?")->execute([$diff, $q_id]);
+            $new_user_vote = $val;
+        }
+    } else {
+        $pdo->prepare("INSERT INTO question_votes (user_id, question_id, vote_type) VALUES (?, ?, ?)")->execute([$user_id, $q_id, $val]);
+        $pdo->prepare("UPDATE questions SET votes = votes + ? WHERE id = ?")->execute([$val, $q_id]);
+        $new_user_vote = $val;
+    }
+
+    $stmt = $pdo->prepare("SELECT votes FROM questions WHERE id = ?");
+    $stmt->execute([$q_id]);
+    $new_total = $stmt->fetchColumn();
+
+    echo json_encode(['status' => 'success', 'new_total' => $new_total, 'user_vote' => $new_user_vote]);
+    exit;
+}
+
+// === CONCORDÂNCIA NO POST PRINCIPAL (PERGUNTA) ===
+elseif ($action === 'agreement_question_ajax') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) { echo json_encode(['status' => 'error', 'message' => 'Login necessário']); exit; }
+
+    $user_id = $_SESSION['user_id'];
+    $q_id = (int)$_POST['q_id'];
+    $val = (int)$_POST['val'];
+
+    $stmt = $pdo->prepare("SELECT agreement_type FROM question_agreements WHERE user_id = ? AND question_id = ?");
+    $stmt->execute([$user_id, $q_id]);
+    $existing = $stmt->fetch();
+    $new_user_agreement = 0;
+
+    if ($existing) {
+        $old_val = (int)$existing['agreement_type'];
+        if ($old_val === $val) {
+            $pdo->prepare("DELETE FROM question_agreements WHERE user_id = ? AND question_id = ?")->execute([$user_id, $q_id]);
+            $pdo->prepare("UPDATE questions SET agreement = agreement - ? WHERE id = ?")->execute([$old_val, $q_id]);
+        } else {
+            $pdo->prepare("UPDATE question_agreements SET agreement_type = ? WHERE user_id = ? AND question_id = ?")->execute([$val, $user_id, $q_id]);
+            $diff = $val - $old_val;
+            $pdo->prepare("UPDATE questions SET agreement = agreement + ? WHERE id = ?")->execute([$diff, $q_id]);
+            $new_user_agreement = $val;
+        }
+    } else {
+        $pdo->prepare("INSERT INTO question_agreements (user_id, question_id, agreement_type) VALUES (?, ?, ?)")->execute([$user_id, $q_id, $val]);
+        $pdo->prepare("UPDATE questions SET agreement = agreement + ? WHERE id = ?")->execute([$val, $q_id]);
+        $new_user_agreement = $val;
+    }
+
+    $stmt = $pdo->prepare("SELECT agreement FROM questions WHERE id = ?");
+    $stmt->execute([$q_id]);
     $new_total = $stmt->fetchColumn();
 
     echo json_encode(['status' => 'success', 'new_total' => $new_total, 'user_agreement' => $new_user_agreement]);

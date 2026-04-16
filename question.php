@@ -13,18 +13,25 @@ function getPostBadge($type) {
     }
 }
 
-// 1. Busca a Pergunta Atual
-$stmt = $pdo->prepare("SELECT q.*, s.name as sig_name, u.username FROM questions q JOIN sigs s ON q.sig_id = s.id JOIN users u ON q.user_id = u.id WHERE q.id = ?");
-$stmt->execute([$q_id]);
+// 1. Busca a Pergunta Atual (AGORA COM JOIN NAS TABELAS DE VOTOS DA PERGUNTA)
+$stmt = $pdo->prepare("
+    SELECT q.*, s.name as sig_name, u.username,
+           qv.vote_type as user_vote,
+           qa.agreement_type as user_agreement
+    FROM questions q
+    JOIN sigs s ON q.sig_id = s.id
+    JOIN users u ON q.user_id = u.id
+    LEFT JOIN question_votes qv ON q.id = qv.question_id AND qv.user_id = ?
+    LEFT JOIN question_agreements qa ON q.id = qa.question_id AND qa.user_id = ?
+    WHERE q.id = ?
+");
+$stmt->execute([$user_id, $user_id, $q_id]);
 $question = $stmt->fetch();
 if (!$question) die("Publicação não encontrada.");
 
 // 2. BUSCA INTELIGENTE (BM25 + VOTOS): Mais do Autor Relacionado
-// Limpamos o título para evitar erros de sintaxe no FTS5 (removemos pontuações)
 $clean_title = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $question['title']);
 $words = array_filter(explode(' ', trim($clean_title)));
-
-// Transforma as palavras numa pesquisa do tipo OR (ex: "A OR B OR C")
 $search_query = implode(' OR ', $words);
 $more_from_user = [];
 
@@ -45,7 +52,6 @@ if (!empty($search_query)) {
     $more_from_user = $stmt->fetchAll();
 }
 
-// Fallback: se o MATCH BM25 não retornar nada (temas muito diferentes ou título só com símbolos)
 if (empty($more_from_user)) {
     $stmt = $pdo->prepare("
         SELECT id, title, post_type, created_at,
@@ -192,7 +198,21 @@ function count_children($parent_id, $comments_by_parent) {
                         </div>
                         <h1 class="fw-bold mb-4 text-dark" style="font-size:1.75rem;"><?= htmlspecialchars($question['title']) ?></h1>
                         <div class="markdown-content question-body mb-4"><?= htmlspecialchars($question['body']) ?></div>
-                    </div>
+
+                        <div class="d-flex align-items-center flex-wrap gap-2 mt-4 pt-3 border-top">
+                            <div class="bg-light rounded-pill border px-2 d-flex align-items-center" title="Avalie a qualidade técnica/relevância desta publicação">
+                                <button id="btn-q-up-<?= $q_id ?>" onclick="voteQuestion(<?= $q_id ?>, 1)" class="btn btn-sm btn-link p-0 <?= $question['user_vote']==1?'text-success':'text-secondary' ?>" style="border:none;"><i class="fas fa-arrow-up"></i></button>
+                                <span id="q-vote-count-<?= $q_id ?>" class="fw-bold mx-2 text-dark small"><?= $question['votes'] ?? 0 ?></span>
+                                <button id="btn-q-down-<?= $q_id ?>" onclick="voteQuestion(<?= $q_id ?>, -1)" class="btn btn-sm btn-link p-0 <?= $question['user_vote']==-1?'text-danger':'text-secondary' ?>" style="border:none;"><i class="fas fa-arrow-down"></i></button>
+                            </div>
+
+                            <div class="bg-light rounded-pill border px-2 d-flex align-items-center" title="Você concorda com esta publicação?">
+                                <button id="btn-q-agree-<?= $q_id ?>" onclick="agreeQuestion(<?= $q_id ?>, 1)" class="btn btn-sm btn-link p-0 <?= $question['user_agreement']==1?'text-primary':'text-secondary' ?>" style="border:none;"><i class="fas fa-check"></i></button>
+                                <span id="q-agree-count-<?= $q_id ?>" class="fw-bold mx-2 text-dark small"><?= $question['agreement'] ?? 0 ?></span>
+                                <button id="btn-q-disagree-<?= $q_id ?>" onclick="agreeQuestion(<?= $q_id ?>, -1)" class="btn btn-sm btn-link p-0 <?= $question['user_agreement']==-1?'text-warning':'text-secondary' ?>" style="border:none;"><i class="fas fa-times"></i></button>
+                            </div>
+                        </div>
+                        </div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
@@ -322,10 +342,8 @@ function count_children($parent_id, $comments_by_parent) {
         });
     }
 
-    // Processa o Markdown
     function parseMarkdown() {
         document.querySelectorAll('.markdown-content').forEach(el => {
-            // Verifica se já foi parseado para não parsear duas vezes
             if (!el.dataset.parsed) {
                 el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
                 el.dataset.parsed = true;
@@ -333,13 +351,11 @@ function count_children($parent_id, $comments_by_parent) {
         });
     }
 
-    // Roda na primeira carga
     document.addEventListener("DOMContentLoaded", parseMarkdown);
 
     function submitAnswer(e, form) {
         e.preventDefault();
 
-        // Se for o formulário principal, joga o texto do EasyMDE pra textarea
         if (form.querySelector('textarea').id === 'mainAnsEditor' && mdeInstance) {
             form.querySelector('textarea').value = mdeInstance.value();
         }
@@ -354,7 +370,7 @@ function count_children($parent_id, $comments_by_parent) {
             btn.innerText=txt; btn.disabled=false;
             if(d.status==='success') {
                 form.querySelector('textarea').value='';
-                if(mdeInstance) mdeInstance.value(''); // limpa o editor se usado
+                if(mdeInstance) mdeInstance.value('');
                 if(!form.closest('#mainReplyForm')) form.parentElement.classList.add('d-none');
 
                 let pid = new FormData(form).get('parent_id');
@@ -365,7 +381,7 @@ function count_children($parent_id, $comments_by_parent) {
                     let div = document.createElement('div');
                     div.innerHTML = d.html;
                     container.prepend(div.firstElementChild);
-                    parseMarkdown(); // Aplica o markdown na resposta nova
+                    parseMarkdown();
                 } else {
                     location.reload();
                 }
@@ -374,6 +390,7 @@ function count_children($parent_id, $comments_by_parent) {
         .catch(e => { console.error(e); btn.innerText=txt; btn.disabled=false; });
     }
 
+    // --- FUNÇÕES DA RESPOSTA (ANSWERS) ---
     function vote(id, val) {
         let fd = new FormData(); fd.append('action','vote_ajax'); fd.append('ans_id',id); fd.append('val',val);
         fetch('post_action.php',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
@@ -393,6 +410,32 @@ function count_children($parent_id, $comments_by_parent) {
                 document.getElementById('agree-count-'+id).innerText = d.new_total;
                 let agreeBtn = document.getElementById('btn-agree-'+id);
                 let disagreeBtn = document.getElementById('btn-disagree-'+id);
+                agreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==1?'text-primary':'text-secondary'}`;
+                disagreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==-1?'text-warning':'text-secondary'}`;
+            }
+        });
+    }
+
+    // --- NOVAS FUNÇÕES PARA O POST PRINCIPAL (QUESTIONS) ---
+    function voteQuestion(id, val) {
+        let fd = new FormData(); fd.append('action','vote_question_ajax'); fd.append('q_id',id); fd.append('val',val);
+        fetch('post_action.php',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+            if(d.status==='success'){
+                document.getElementById('q-vote-count-'+id).innerText = d.new_total;
+                let up = document.getElementById('btn-q-up-'+id), down = document.getElementById('btn-q-down-'+id);
+                up.className = `btn btn-sm btn-link p-0 ${d.user_vote==1?'text-success':'text-secondary'}`;
+                down.className = `btn btn-sm btn-link p-0 ${d.user_vote==-1?'text-danger':'text-secondary'}`;
+            }
+        });
+    }
+
+    function agreeQuestion(id, val) {
+        let fd = new FormData(); fd.append('action', 'agreement_question_ajax'); fd.append('q_id', id); fd.append('val', val);
+        fetch('post_action.php', {method: 'POST', body: fd}).then(r => r.json()).then(d => {
+            if(d.status === 'success'){
+                document.getElementById('q-agree-count-'+id).innerText = d.new_total;
+                let agreeBtn = document.getElementById('btn-q-agree-'+id);
+                let disagreeBtn = document.getElementById('btn-q-disagree-'+id);
                 agreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==1?'text-primary':'text-secondary'}`;
                 disagreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==-1?'text-warning':'text-secondary'}`;
             }
