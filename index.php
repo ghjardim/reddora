@@ -16,7 +16,7 @@ $stmt = $pdo->prepare("SELECT s.* FROM sigs s JOIN sig_memberships m ON s.id = m
 $stmt->execute([$user_id]);
 $my_sigs = $stmt->fetchAll();
 
-// 2. Feed - FILTRANDO APENAS RESPOSTAS DE NÍVEL SUPERIOR
+// 2. Feed - Atualizado para buscar o autor original (question_username)
 $stmt = $pdo->prepare("
     SELECT
         a.id as answer_id,
@@ -28,13 +28,16 @@ $stmt = $pdo->prepare("
         q.id as question_id,
         q.title as question_title,
         q.post_type,
+        qu.username as question_username,
+        qu.id as question_user_id,
         s.id as sig_id,
         s.name as sig_name,
         v.vote_type as user_vote
     FROM answers a
     JOIN questions q ON a.question_id = q.id
     JOIN sigs s ON q.sig_id = s.id
-    JOIN users u ON a.user_id = u.id
+    JOIN users u ON a.user_id = u.id -- Autor da Resposta
+    JOIN users qu ON q.user_id = qu.id -- Autor Original do Post
     JOIN sig_memberships m ON s.id = m.sig_id
     LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ?
     WHERE m.user_id = ?
@@ -160,8 +163,12 @@ $feed_items = $stmt->fetchAll();
                 ?>
                 <div class="card mb-3 hover-card border-0 shadow-sm">
                     <div class="card-body pb-2">
-                        <div class="mb-2 text-muted small d-flex align-items-center">
+                        <div class="mb-2 text-muted small d-flex align-items-center flex-wrap">
                             <?= getPostBadge($item['post_type']) ?>
+                            <span class="text-secondary mx-1">por</span>
+                            <a href="profile.php?id=<?= $item['question_user_id'] ?>" class="text-decoration-none fw-bold text-dark me-1" style="position: relative; z-index: 2;">
+                                u/<?= htmlspecialchars($item['question_username']) ?>
+                            </a>
                             <span class="text-secondary mx-1">em</span>
                             <a href="sig.php?id=<?= $item['sig_id'] ?>" class="text-decoration-none fw-bold text-dark" style="position: relative; z-index: 2;">
                                 <?= htmlspecialchars($item['sig_name']) ?>
@@ -235,7 +242,6 @@ $feed_items = $stmt->fetchAll();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    // Inicializa o Editor Markdown
     const bodyTextarea = document.getElementById('postEditor');
     if(bodyTextarea) {
         new EasyMDE({
@@ -246,7 +252,6 @@ $feed_items = $stmt->fetchAll();
         });
     }
 
-    // Renderiza todo o conteúdo Markdown da página
     document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll('.markdown-content').forEach(el => {
             el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
