@@ -3,7 +3,6 @@ require 'db.php';
 
 $user_id = $_SESSION['user_id'];
 
-// Função para renderizar as badges de tipo
 function getPostBadge($type) {
     switch($type) {
         case 'post': return '<span class="badge bg-success text-white border me-1"><i class="fas fa-file-alt"></i> Ensaio</span>';
@@ -17,7 +16,7 @@ $stmt = $pdo->prepare("SELECT s.* FROM sigs s JOIN sig_memberships m ON s.id = m
 $stmt->execute([$user_id]);
 $my_sigs = $stmt->fetchAll();
 
-// 2. Feed - FILTRANDO APENAS RESPOSTAS DE NÍVEL SUPERIOR (parent_id IS NULL)
+// 2. Feed - FILTRANDO APENAS RESPOSTAS DE NÍVEL SUPERIOR
 $stmt = $pdo->prepare("
     SELECT
         a.id as answer_id,
@@ -53,10 +52,19 @@ $feed_items = $stmt->fetchAll();
     <title>Reddora - Feed</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+    <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
     <link rel="stylesheet" href="style.css">
     <style>
         .read-more-link { cursor: pointer; font-size: 0.9em; text-decoration: none; font-weight: bold; }
         .read-more-link:hover { text-decoration: underline; }
+        .markdown-content img { max-width: 100%; height: auto; border-radius: 8px; }
+        .markdown-content pre { background: #f8f9fa; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
+        .markdown-content blockquote { border-left: 4px solid #dee2e6; padding-left: 1rem; color: #6c757d; }
     </style>
 </head>
 <body>
@@ -81,7 +89,7 @@ $feed_items = $stmt->fetchAll();
 
             <div class="col-md-3 d-none d-md-block">
                 <div class="card shadow-sm mb-3 sticky-top" style="top: 90px; z-index: 1;">
-                    <div class="card-header bg-white fw-bold text-uppercase small text-muted">Os teus Sigs</div>
+                    <div class="card-header bg-white fw-bold text-uppercase small text-muted">Seus Sigs</div>
                     <div class="list-group list-group-flush">
                         <?php foreach($my_sigs as $sig): ?>
                             <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0">
@@ -89,7 +97,7 @@ $feed_items = $stmt->fetchAll();
                             </a>
                         <?php endforeach; ?>
                         <?php if(empty($my_sigs)): ?>
-                            <div class="list-group-item text-muted small">Não segues nenhuma comunidade.</div>
+                            <div class="list-group-item text-muted small">Você não segue nada.</div>
                         <?php endif; ?>
                     </div>
                     <div class="card-footer bg-white p-3">
@@ -107,27 +115,27 @@ $feed_items = $stmt->fetchAll();
                             <i class="fas fa-pen"></i>
                         </div>
                         <button class="btn btn-light text-start text-muted flex-grow-1 rounded-pill border" type="button" data-bs-toggle="collapse" data-bs-target="#questionForm">
-                            O que pretendes partilhar?
+                            O que você quer compartilhar?
                         </button>
                     </div>
                     <div class="collapse p-3 border-top" id="questionForm">
-                        <form action="post_action.php" method="POST">
+                        <form action="post_action.php" method="POST" id="mainPostForm">
                             <input type="hidden" name="action" value="create_question">
                             <input type="hidden" name="redirect" value="index.php">
                             <div class="mb-2">
                                 <select name="sig_id" class="form-select form-select-sm mb-2" required>
-                                    <option value="" disabled selected>Escolhe a Comunidade...</option>
+                                    <option value="" disabled selected>Escolha a Comunidade...</option>
                                     <?php foreach($my_sigs as $sig): ?>
                                         <option value="<?= $sig['id'] ?>"><?= htmlspecialchars($sig['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                                 <select name="post_type" class="form-select form-select-sm mb-2" required>
                                     <option value="question">❓ Pergunta (Tenho uma dúvida)</option>
-                                    <option value="post">📝 Ensaio / Post (Quero partilhar uma tese/análise)</option>
+                                    <option value="post">📝 Ensaio / Post (Quero compartilhar uma tese/análise)</option>
                                     <option value="short">⚡ Curto (Apenas um pensamento rápido)</option>
                                 </select>
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título..." required>
-                                <textarea name="body" class="form-control mb-2" placeholder="Contexto ou conteúdo..."></textarea>
+                                <textarea name="body" id="postEditor" class="form-control mb-2" placeholder="Contexto ou conteúdo (Markdown suportado)..."></textarea>
                             </div>
                             <div class="text-end">
                                 <button type="submit" class="btn btn-primary btn-sm px-4">Publicar</button>
@@ -175,16 +183,16 @@ $feed_items = $stmt->fetchAll();
                                 $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
                             ?>
                                 <span id="short-text-<?= $ans_id ?>">
-                                    <?= nl2br(htmlspecialchars($short_body)) ?>
+                                    <span class="markdown-content d-inline"><?= htmlspecialchars($short_body) ?></span>
                                     <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
                                 </span>
 
                                 <span id="full-text-<?= $ans_id ?>" class="d-none">
-                                    <?= nl2br(htmlspecialchars($full_body)) ?>
+                                    <span class="markdown-content d-inline"><?= htmlspecialchars($full_body) ?></span>
                                     <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
                                 </span>
                             <?php else: ?>
-                                <?= nl2br(htmlspecialchars($full_body)) ?>
+                                <div class="markdown-content"><?= htmlspecialchars($full_body) ?></div>
                             <?php endif; ?>
                         </div>
 
@@ -215,9 +223,28 @@ $feed_items = $stmt->fetchAll();
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+    // Inicializa o Editor Markdown
+    const bodyTextarea = document.getElementById('postEditor');
+    if(bodyTextarea) {
+        new EasyMDE({
+            element: bodyTextarea,
+            spellChecker: false,
+            status: false,
+            toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "image", "preview"]
+        });
+    }
+
+    // Renderiza todo o conteúdo Markdown da página
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll('.markdown-content').forEach(el => {
+            el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
+        });
+    });
+
     function toggleAnswer(id) {
         const shortText = document.getElementById('short-text-' + id);
         const fullText = document.getElementById('full-text-' + id);

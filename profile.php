@@ -61,20 +61,35 @@ if ($active_tab === 'all') {
     foreach ($answers as $a) $mixed_feed[] = ['type' => 'answer', 'date' => $a['created_at'], 'data' => $a];
     usort($mixed_feed, function($a, $b) { return strtotime($b['date']) - strtotime($a['date']); });
 }
+
+function getPostBadge($type) {
+    switch($type) {
+        case 'post': return '<span class="badge bg-success text-white border me-1"><i class="fas fa-file-alt"></i> Ensaio</span>';
+        case 'short': return '<span class="badge bg-warning text-dark border me-1"><i class="fas fa-bolt"></i> Curto</span>';
+        default: return '<span class="badge bg-primary text-white border me-1"><i class="fas fa-question-circle"></i> Pergunta</span>';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Perfil de <?= htmlspecialchars($profile_user['username']) ?></title>
+    <title>Perfil de <?= htmlspecialchars($profile_user['username']) ?> - Reddora</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
     <link rel="stylesheet" href="style.css">
     <style>
         .read-more-link { cursor: pointer; font-size: 0.9em; text-decoration: none; font-weight: bold; }
         .read-more-link:hover { text-decoration: underline; }
 
-        /* Estilo Diminuto para Respostas Aninhadas */
+        .markdown-content img { max-width: 100%; height: auto; border-radius: 8px; }
+        .markdown-content pre { background: #f8f9fa; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
+        .markdown-content blockquote { border-left: 4px solid #dee2e6; padding-left: 1rem; color: #6c757d; }
+
         .nested-reply-card {
             background-color: #f8f9fa;
             border-left: 3px solid #ced4da;
@@ -88,11 +103,19 @@ if ($active_tab === 'all') {
         }
     </style>
 </head>
-<body>
+<body class="bg-light">
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
+
+            <form action="search.php" method="GET" class="mx-auto d-none d-md-flex" style="max-width: 400px; width: 100%;">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar na Reddora..." required>
+                    <button class="btn btn-light text-primary fw-bold px-3" type="submit"><i class="fas fa-search"></i></button>
+                </div>
+            </form>
+
             <div class="d-flex align-items-center">
                 <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white text-decoration-none me-3">
                     <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?>
@@ -119,7 +142,6 @@ if ($active_tab === 'all') {
         </div>
 
         <div class="row">
-
             <div class="col-lg-8 mb-4">
 
                 <ul class="nav nav-tabs nav-fill mb-4 border-bottom-0">
@@ -151,15 +173,16 @@ if ($active_tab === 'all') {
                             <?php if ($item['type'] === 'question'): $q = $item['data']; ?>
                                 <div class="list-group-item list-group-item-action py-3 border-0 border-bottom">
                                     <div class="d-flex w-100 justify-content-between mb-1">
-                                        <h5 class="mb-1">
-                                            <a href="question.php?id=<?= $q['id'] ?>" class="question-link">
+                                        <h5 class="mb-1 fw-bold">
+                                            <?= getPostBadge($q['post_type']) ?>
+                                            <a href="question.php?id=<?= $q['id'] ?>" class="question-link text-dark text-decoration-none">
                                                 <?= htmlspecialchars($q['title']) ?>
                                             </a>
                                         </h5>
                                         <small class="text-muted"><?= date('d/m/Y', strtotime($q['created_at'])) ?></small>
                                     </div>
                                     <div class="mt-2 text-muted small">
-                                        <i class="fas fa-question-circle"></i> Perguntou em
+                                        <i class="fas fa-folder-open"></i> Em
                                         <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none fw-bold" style="color: var(--reddora-dark);">
                                             <?= htmlspecialchars($q['sig_name']) ?>
                                         </a>
@@ -169,28 +192,23 @@ if ($active_tab === 'all') {
                             <?php else:
                                 $ans = $item['data'];
                                 $ans_id = $ans['id'];
-                                $is_nested = !empty($ans['parent_id']); // Verifica se é resposta de resposta
+                                $is_nested = !empty($ans['parent_id']);
                                 $full_body = $ans['body'];
                                 $limit = 200;
                                 $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
                             ?>
-                                <?php if ($is_nested): ?>
-                                    <div class="list-group-item py-2 border-0 border-bottom">
-                                        <div class="nested-reply-card rounded">
+                                <div class="list-group-item py-3 border-0 border-bottom">
+                                    <?php if ($is_nested): ?>
+                                        <div class="nested-reply-card rounded mb-2">
                                             <div class="reply-meta d-flex justify-content-between">
                                                 <span><i class="fas fa-reply me-1"></i> Réplica em: <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-muted fw-bold text-decoration-none"><?= htmlspecialchars($ans['question_title']) ?></a></span>
                                                 <span><?= date('d/m', strtotime($ans['created_at'])) ?></span>
                                             </div>
-                                            <div class="text-secondary text-truncate fst-italic" style="max-width: 90%;">
-                                                "<?= htmlspecialchars(mb_substr($full_body, 0, 100)) . (strlen($full_body)>100?'...':'') ?>"
-                                            </div>
-                                            <div class="mt-1">
-                                                <a href="question.php?id=<?= $ans['question_id'] ?>" class="small text-primary fw-bold text-decoration-none">Ver contexto</a>
+                                            <div class="markdown-content text-secondary small fst-italic">
+                                                <?= htmlspecialchars(mb_substr($full_body, 0, 100)) . (strlen($full_body)>100?'...':'') ?>
                                             </div>
                                         </div>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="list-group-item py-3 border-0 border-bottom">
+                                    <?php else: ?>
                                         <small class="text-muted">
                                             <i class="fas fa-comment"></i> Respondeu em:
                                             <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-dark fw-bold text-decoration-none">
@@ -199,30 +217,26 @@ if ($active_tab === 'all') {
                                         </small>
 
                                         <div class="mb-1 mt-2 text-dark">
-                                            <?php if ($is_long):
-                                                $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
-                                            ?>
+                                            <?php if ($is_long): $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...'; ?>
                                                 <span id="short-text-<?= $ans_id ?>">
-                                                    <?= nl2br(htmlspecialchars($short_body)) ?>
+                                                    <span class="markdown-content d-inline"><?= htmlspecialchars($short_body) ?></span>
                                                     <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
                                                 </span>
                                                 <span id="full-text-<?= $ans_id ?>" class="d-none">
-                                                    <?= nl2br(htmlspecialchars($full_body)) ?>
+                                                    <span class="markdown-content d-inline"><?= htmlspecialchars($full_body) ?></span>
                                                     <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
                                                 </span>
                                             <?php else: ?>
-                                                <?= nl2br(htmlspecialchars($full_body)) ?>
+                                                <div class="markdown-content"><?= htmlspecialchars($full_body) ?></div>
                                             <?php endif; ?>
                                         </div>
+                                    <?php endif; ?>
 
-                                        <div class="d-flex justify-content-between align-items-center mt-2">
-                                            <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
-                                            <div class="d-flex align-items-center">
-                                                <span class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $ans['votes'] ?> pts</span>
-                                            </div>
-                                        </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
+                                        <span class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $ans['votes'] ?> pts</span>
                                     </div>
-                                <?php endif; ?>
+                                </div>
                             <?php endif; ?>
 
                         <?php endforeach; ?>
@@ -234,22 +248,20 @@ if ($active_tab === 'all') {
                         <?php foreach($questions as $q): ?>
                             <div class="list-group-item list-group-item-action py-3 border-0 border-bottom">
                                 <div class="d-flex w-100 justify-content-between mb-1">
-                                    <h5 class="mb-1">
-                                        <a href="question.php?id=<?= $q['id'] ?>" class="question-link">
+                                    <h5 class="mb-1 fw-bold">
+                                        <?= getPostBadge($q['post_type']) ?>
+                                        <a href="question.php?id=<?= $q['id'] ?>" class="question-link text-dark text-decoration-none">
                                             <?= htmlspecialchars($q['title']) ?>
                                         </a>
                                     </h5>
                                     <small class="text-muted"><?= date('d/m/Y', strtotime($q['created_at'])) ?></small>
                                 </div>
                                 <div class="mt-2 text-muted small">
-                                    <i class="fas fa-question-circle"></i> Perguntou em
-                                    <a href="sig.php?id=<?= $q['sig_id'] ?>" class="text-decoration-none fw-bold" style="color: var(--reddora-dark);">
-                                        <?= htmlspecialchars($q['sig_name']) ?>
-                                    </a>
+                                    <i class="fas fa-folder-open"></i> Em <?= htmlspecialchars($q['sig_name']) ?>
                                 </div>
                             </div>
                         <?php endforeach; ?>
-                        <?php if(empty($questions)) echo "<div class='p-4 bg-white text-center text-muted border rounded'>Nenhuma pergunta.</div>"; ?>
+                        <?php if(empty($questions)) echo "<div class='p-4 bg-white text-center text-muted border rounded'>Nenhuma pergunta encontrada.</div>"; ?>
                     </div>
                 <?php endif; ?>
 
@@ -257,71 +269,52 @@ if ($active_tab === 'all') {
                     <div class="list-group shadow-sm">
                         <?php foreach($answers as $ans):
                             $ans_id = $ans['id'];
-                            $is_nested = !empty($ans['parent_id']);
                             $full_body = $ans['body'];
                             $limit = 280;
                             $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
                         ?>
-                            <?php if ($is_nested): ?>
-                                <div class="list-group-item py-2 border-0 border-bottom">
-                                    <div class="nested-reply-card rounded">
-                                        <div class="reply-meta d-flex justify-content-between">
-                                            <span><i class="fas fa-reply me-1"></i> Réplica em: <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-muted fw-bold text-decoration-none"><?= htmlspecialchars($ans['question_title']) ?></a></span>
-                                            <span><?= date('d/m', strtotime($ans['created_at'])) ?></span>
-                                        </div>
-                                        <div class="text-secondary text-truncate fst-italic">
-                                            "<?= htmlspecialchars(mb_substr($full_body, 0, 100)) . (strlen($full_body)>100?'...':'') ?>"
-                                        </div>
-                                        <div class="mt-1"><a href="question.php?id=<?= $ans['question_id'] ?>" class="small text-primary fw-bold text-decoration-none">Ver</a></div>
-                                    </div>
+                            <div class="list-group-item py-3 border-0 border-bottom">
+                                <small class="text-muted">
+                                    <i class="fas fa-reply"></i> Em: <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-dark fw-bold text-decoration-none"><?= htmlspecialchars($ans['question_title']) ?></a>
+                                </small>
+                                <div class="mb-1 mt-2 text-dark">
+                                    <?php if ($is_long): $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...'; ?>
+                                        <span id="short-text-<?= $ans_id ?>">
+                                            <span class="markdown-content d-inline"><?= htmlspecialchars($short_body) ?></span>
+                                            <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
+                                        </span>
+                                        <span id="full-text-<?= $ans_id ?>" class="d-none">
+                                            <span class="markdown-content d-inline"><?= htmlspecialchars($full_body) ?></span>
+                                            <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
+                                        </span>
+                                    <?php else: ?>
+                                        <div class="markdown-content"><?= htmlspecialchars($full_body) ?></div>
+                                    <?php endif; ?>
                                 </div>
-                            <?php else: ?>
-                                <div class="list-group-item py-3 border-0 border-bottom">
-                                    <small class="text-muted">
-                                        <i class="fas fa-comment"></i> Respondeu em:
-                                        <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-dark fw-bold text-decoration-none"><?= htmlspecialchars($ans['question_title']) ?></a>
-                                    </small>
-                                    <div class="mb-1 mt-2 text-dark">
-                                        <?php if ($is_long): $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...'; ?>
-                                            <span id="short-text-<?= $ans_id ?>">
-                                                <?= nl2br(htmlspecialchars($short_body)) ?>
-                                                <a class="read-more-link text-primary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler mais</a>
-                                            </span>
-                                            <span id="full-text-<?= $ans_id ?>" class="d-none">
-                                                <?= nl2br(htmlspecialchars($full_body)) ?>
-                                                <a class="read-more-link text-secondary" onclick="toggleAnswer(<?= $ans_id ?>)">Ler menos</a>
-                                            </span>
-                                        <?php else: ?>
-                                            <?= nl2br(htmlspecialchars($full_body)) ?>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center mt-2">
-                                        <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
-                                        <div class="d-flex align-items-center">
-                                            <span class="badge <?= $ans['votes'] >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $ans['votes'] ?> pts</span>
-                                        </div>
-                                    </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <small class="text-muted"><?= date('d/m/Y', strtotime($ans['created_at'])) ?></small>
+                                    <span class="badge bg-light text-dark border"><?= $ans['votes'] ?> pts</span>
                                 </div>
-                            <?php endif; ?>
+                            </div>
                         <?php endforeach; ?>
-                        <?php if(empty($answers)) echo "<div class='p-4 bg-white text-center text-muted border rounded'>Nenhuma resposta.</div>"; ?>
+                        <?php if(empty($answers)) echo "<div class='p-4 bg-white text-center text-muted border rounded'>Nenhuma resposta encontrada.</div>"; ?>
                     </div>
                 <?php endif; ?>
 
             </div>
 
             <div class="col-lg-4">
-                <div class="card shadow-sm mb-3">
+                <div class="card shadow-sm mb-3 border-0">
                     <div class="card-header bg-white fw-bold text-uppercase small text-muted">Estatísticas</div>
                     <div class="card-body">
                         <div class="row text-center">
                             <div class="col-4">
-                                <div class="h4 fw-bold mb-0" style="color: var(--reddora-red)"><?= $total_karma ?></div>
+                                <div class="h4 fw-bold mb-0 text-primary"><?= $total_karma ?></div>
                                 <small class="text-muted text-uppercase" style="font-size:0.65rem;">Karma</small>
                             </div>
                             <div class="col-4 border-start border-end">
                                 <div class="h4 fw-bold text-dark mb-0"><?= count($questions) ?></div>
-                                <small class="text-muted text-uppercase" style="font-size:0.65rem;">Perguntas</small>
+                                <small class="text-muted text-uppercase" style="font-size:0.65rem;">Posts</small>
                             </div>
                             <div class="col-4">
                                 <div class="h4 fw-bold text-dark mb-0"><?= count($answers) ?></div>
@@ -331,7 +324,7 @@ if ($active_tab === 'all') {
                     </div>
                 </div>
 
-                <div class="card shadow-sm mb-3">
+                <div class="card shadow-sm mb-3 border-0">
                     <div class="card-header bg-white fw-bold text-uppercase small text-muted d-flex justify-content-between align-items-center">
                         <span>Comunidades</span>
                         <span class="badge bg-light text-dark border rounded-pill"><?= count($user_sigs) ?></span>
@@ -353,14 +346,30 @@ if ($active_tab === 'all') {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Motor de Renderização Markdown
+    function renderMarkdown() {
+        document.querySelectorAll('.markdown-content').forEach(el => {
+            if (!el.dataset.parsed) {
+                el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
+                el.dataset.parsed = true;
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", renderMarkdown);
+
     function toggleAnswer(id) {
         const shortText = document.getElementById('short-text-' + id);
         const fullText = document.getElementById('full-text-' + id);
         if (shortText.classList.contains('d-none')) {
-            shortText.classList.remove('d-none'); fullText.classList.add('d-none');
+            shortText.classList.remove('d-none');
+            fullText.classList.add('d-none');
         } else {
-            shortText.classList.add('d-none'); fullText.classList.remove('d-none');
+            shortText.classList.add('d-none');
+            fullText.classList.remove('d-none');
         }
+        // Reprocessa o Markdown se necessário ao expandir
+        renderMarkdown();
     }
     </script>
 </body>
