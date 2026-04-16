@@ -19,18 +19,46 @@ $stmt->execute([$q_id]);
 $question = $stmt->fetch();
 if (!$question) die("Publicação não encontrada.");
 
-// 2. Busca Mais Publicações do Mesmo Autor (Excluindo a atual)
-$stmt = $pdo->prepare("
-    SELECT id, title, post_type, created_at,
-    (SELECT COUNT(*) FROM answers WHERE question_id = questions.id) as answer_count,
-    (SELECT COALESCE(SUM(votes), 0) FROM answers WHERE question_id = questions.id) as total_score
-    FROM questions
-    WHERE user_id = ? AND id != ?
-    ORDER BY created_at DESC
-    LIMIT 3
-");
-$stmt->execute([$question['user_id'], $q_id]);
-$more_from_user = $stmt->fetchAll();
+// 2. BUSCA INTELIGENTE (BM25 + VOTOS): Mais do Autor Relacionado
+// Limpamos o título para evitar erros de sintaxe no FTS5 (removemos pontuações)
+$clean_title = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $question['title']);
+$words = array_filter(explode(' ', trim($clean_title)));
+
+// Transforma as palavras numa pesquisa do tipo OR (ex: "A OR B OR C")
+$search_query = implode(' OR ', $words);
+$more_from_user = [];
+
+if (!empty($search_query)) {
+    $stmt = $pdo->prepare("
+        SELECT q.*,
+               (SELECT COUNT(*) FROM answers WHERE question_id = q.id) as answer_count,
+               (SELECT COALESCE(SUM(votes), 0) FROM answers WHERE question_id = q.id) as total_score
+        FROM questions_fts fts
+        JOIN questions q ON fts.rowid = q.id
+        WHERE questions_fts MATCH ?
+          AND q.user_id = ?
+          AND q.id != ?
+        ORDER BY fts.rank ASC, total_score DESC
+        LIMIT 3
+    ");
+    $stmt->execute([$search_query, $question['user_id'], $q_id]);
+    $more_from_user = $stmt->fetchAll();
+}
+
+// Fallback: se o MATCH BM25 não retornar nada (temas muito diferentes ou título só com símbolos)
+if (empty($more_from_user)) {
+    $stmt = $pdo->prepare("
+        SELECT id, title, post_type, created_at,
+        (SELECT COUNT(*) FROM answers WHERE question_id = questions.id) as answer_count,
+        (SELECT COALESCE(SUM(votes), 0) FROM answers WHERE question_id = questions.id) as total_score
+        FROM questions
+        WHERE user_id = ? AND id != ?
+        ORDER BY created_at DESC
+        LIMIT 3
+    ");
+    $stmt->execute([$question['user_id'], $q_id]);
+    $more_from_user = $stmt->fetchAll();
+}
 
 // 3. Busca as Respostas do Post Atual
 $stmt = $pdo->prepare("
@@ -86,7 +114,7 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
                         <input type="hidden" name="action" value="answer_ajax">
                         <input type="hidden" name="question_id" value="<?= $q_id ?>">
                         <input type="hidden" name="parent_id" value="<?= $ans_id ?>">
-                        <textarea name="body" class="form-control form-control-sm mb-1" rows="2" placeholder="Sua resposta (Markdown suportado)..."></textarea>
+                        <textarea name="body" class="form-control form-control-sm mb-1" rows="2" placeholder="A sua resposta (Markdown suportado)..."></textarea>
                         <button class="btn btn-primary btn-sm py-0 px-3">Enviar</button>
                     </form>
                 </div>
@@ -181,7 +209,7 @@ function count_children($parent_id, $comments_by_parent) {
                         <form onsubmit="submitAnswer(event, this)">
                             <input type="hidden" name="action" value="answer_ajax">
                             <input type="hidden" name="question_id" value="<?= $q_id ?>">
-                            <label class="form-label small fw-bold text-muted">Sua resposta</label>
+                            <label class="form-label small fw-bold text-muted">A sua resposta</label>
                             <textarea name="body" id="mainAnsEditor" class="form-control mb-2" rows="4" placeholder="Adicione à discussão..."></textarea>
                             <div class="text-end"><button class="btn btn-primary px-4 fw-bold">Postar</button></div>
                         </form>
@@ -223,7 +251,7 @@ function count_children($parent_id, $comments_by_parent) {
                                             <input type="hidden" name="action" value="answer_ajax">
                                             <input type="hidden" name="question_id" value="<?= $q_id ?>">
                                             <input type="hidden" name="parent_id" value="<?= $ans_id ?>">
-                                            <textarea name="body" class="form-control mb-2" rows="2" placeholder="Sua resposta (Markdown)..."></textarea>
+                                            <textarea name="body" class="form-control mb-2" rows="2" placeholder="A sua resposta (Markdown)..."></textarea>
                                             <button class="btn btn-primary btn-sm">Enviar</button>
                                         </form>
                                     </div>
@@ -272,7 +300,7 @@ function count_children($parent_id, $comments_by_parent) {
                         </div>
                     <?php else: ?>
                         <div class="alert alert-light text-center border shadow-sm text-muted py-4">
-                            <i class="fas fa-file-signature fa-2x mb-3 opacity-50"></i><br>
+                            <i class="fas fa-layer-group fa-2x mb-3 opacity-50"></i><br>
                             Este utilizador não tem outras publicações.
                         </div>
                     <?php endif; ?>
