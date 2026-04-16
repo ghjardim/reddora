@@ -9,6 +9,15 @@ if (!isset($_GET['id'])) {
 $sig_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
+// Função para renderizar as badges de tipo
+function getPostBadge($type) {
+    switch($type) {
+        case 'post': return '<span class="badge bg-success text-white border me-1"><i class="fas fa-file-alt"></i> Ensaio</span>';
+        case 'short': return '<span class="badge bg-warning text-dark border me-1"><i class="fas fa-bolt"></i> Curto</span>';
+        default: return '<span class="badge bg-primary text-white border me-1"><i class="fas fa-question-circle"></i> Pergunta</span>';
+    }
+}
+
 // 1. Busca Informações do SIG
 $stmt = $pdo->prepare("SELECT * FROM sigs WHERE id = ?");
 $stmt->execute([$sig_id]);
@@ -21,7 +30,7 @@ $stmt = $pdo->prepare("SELECT 1 FROM sig_memberships WHERE user_id = ? AND sig_i
 $stmt->execute([$user_id, $sig_id]);
 $is_member = (bool)$stmt->fetch();
 
-// 3. Busca Perguntas
+// 3. Busca Perguntas/Posts
 $stmt = $pdo->prepare("
     SELECT q.*, u.username,
     (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id) as answer_count
@@ -104,23 +113,29 @@ $questions = $stmt->fetchAll();
                 <?php if($is_member): ?>
                     <div class="card mb-4 shadow-sm border-0">
                         <div class="card-body bg-white rounded">
-                            <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">Criar post em <?= htmlspecialchars($sig['name']) ?></h6>
+                            <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">Criar publicação em <?= htmlspecialchars($sig['name']) ?></h6>
                             <form action="post_action.php" method="POST">
                                 <input type="hidden" name="action" value="create_question">
                                 <input type="hidden" name="sig_id" value="<?= $sig['id'] ?>">
+                                <input type="hidden" name="redirect" value="sig.php?id=<?= $sig['id'] ?>">
 
+                                <select name="post_type" class="form-select form-select-sm mb-2" required>
+                                    <option value="question">❓ Pergunta</option>
+                                    <option value="post">📝 Ensaio / Post</option>
+                                    <option value="short">⚡ Curto</option>
+                                </select>
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título interessante..." required>
-                                <textarea name="body" class="form-control mb-2" placeholder="O que você quer compartilhar?" rows="2"></textarea>
+                                <textarea name="body" class="form-control mb-2" placeholder="O que pretendes partilhar?" rows="2"></textarea>
 
                                 <div class="text-end">
-                                    <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">Postar</button>
+                                    <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">Publicar</button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 <?php else: ?>
                     <div class="alert alert-light text-center border shadow-sm mb-4">
-                        Você precisa entrar nesta comunidade para postar.
+                        Precisas de entrar nesta comunidade para publicar.
                     </div>
                 <?php endif; ?>
 
@@ -141,13 +156,11 @@ $questions = $stmt->fetchAll();
                 ?>
                 <div class="card mb-3 hover-card">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between text-muted small mb-2">
-                            <span>
-                                Postado por
-                                <a href="profile.php?id=<?= $q['user_id'] ?>" class="text-decoration-none fw-bold text-dark">
-                                    u/<?= htmlspecialchars($q['username']) ?>
-                                </a>
-                            </span>
+                        <div class="d-flex justify-content-between align-items-center text-muted small mb-2">
+                            <div class="d-flex align-items-center">
+                                <?= getPostBadge($q['post_type']) ?>
+                                <span class="ms-1">Postado por <a href="profile.php?id=<?= $q['user_id'] ?>" class="text-decoration-none fw-bold text-dark">u/<?= htmlspecialchars($q['username']) ?></a></span>
+                            </div>
                             <span><?= date('d/m H:i', strtotime($q['created_at'])) ?></span>
                         </div>
 

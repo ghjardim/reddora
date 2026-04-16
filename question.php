@@ -5,13 +5,22 @@ if (!isset($_GET['id'])) die("<div class='alert alert-danger'>Erro: ID necessár
 $q_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
+// Função para renderizar as badges de tipo
+function getPostBadge($type) {
+    switch($type) {
+        case 'post': return '<span class="badge bg-success text-white border me-2"><i class="fas fa-file-alt"></i> Ensaio</span>';
+        case 'short': return '<span class="badge bg-warning text-dark border me-2"><i class="fas fa-bolt"></i> Curto</span>';
+        default: return '<span class="badge bg-primary text-white border me-2"><i class="fas fa-question-circle"></i> Pergunta</span>';
+    }
+}
+
 // Pergunta
 $stmt = $pdo->prepare("SELECT q.*, s.name as sig_name, u.username FROM questions q JOIN sigs s ON q.sig_id = s.id JOIN users u ON q.user_id = u.id WHERE q.id = ?");
 $stmt->execute([$q_id]);
 $question = $stmt->fetch();
-if (!$question) die("Pergunta não encontrada.");
+if (!$question) die("Publicação não encontrada.");
 
-// Respostas (AGORA COM AGREEMENT e USER_AGREEMENT)
+// Respostas (COM AGREEMENT e USER_AGREEMENT)
 $stmt = $pdo->prepare("
     SELECT a.*, u.username,
            v.vote_type as user_vote,
@@ -31,9 +40,7 @@ foreach ($all_answers as $ans) { $pid = $ans['parent_id'] ?: 0; $comments_by_par
 
 // Função Recursiva para renderizar FILHOS
 function render_replies($parent_id, $comments_by_parent, $q_id) {
-    // Container essencial para o AJAX
     echo '<div id="replies-container-' . $parent_id . '">';
-
     if (isset($comments_by_parent[$parent_id])) {
         foreach ($comments_by_parent[$parent_id] as $ans) {
             $ans_id = $ans['id'];
@@ -119,6 +126,7 @@ function count_children($parent_id, $comments_by_parent) {
                 <div class="card main-question-card border-0 mb-5">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center mb-3">
+                            <?= getPostBadge($question['post_type']) ?>
                             <a href="sig.php?id=<?= $question['sig_id'] ?>" class="badge bg-light text-dark border text-decoration-none me-2"><?= htmlspecialchars($question['sig_name']) ?></a>
                             <span class="text-muted small">u/<?= htmlspecialchars($question['username']) ?> &bull; <?= date('d/m/Y', strtotime($question['created_at'])) ?></span>
                         </div>
@@ -249,7 +257,7 @@ function count_children($parent_id, $comments_by_parent) {
         });
     }
 
-    // NOVA FUNÇÃO: Concordância (Agreement)
+    // Função: Concordância (Agreement)
     function agree(id, val) {
         let fd = new FormData();
         fd.append('action', 'agreement_ajax');

@@ -4,7 +4,7 @@ require 'db.php';
 
 $action = $_POST['action'] ?? '';
 
-// === VOTAÇÃO VIA AJAX ===
+// === VOTAÇÃO DE KARMA (QUALIDADE) ===
 if ($action === 'vote_ajax') {
     header('Content-Type: application/json');
     if (!isset($_SESSION['user_id'])) { echo json_encode(['status' => 'error', 'message' => 'Login necessário']); exit; }
@@ -13,7 +13,6 @@ if ($action === 'vote_ajax') {
     $ans_id = (int)$_POST['ans_id'];
     $val = (int)$_POST['val'];
 
-    // Lógica de Votação (Toggle/Update/Insert)
     $stmt = $pdo->prepare("SELECT vote_type FROM answer_votes WHERE user_id = ? AND answer_id = ?");
     $stmt->execute([$user_id, $ans_id]);
     $existing = $stmt->fetch();
@@ -43,6 +42,7 @@ if ($action === 'vote_ajax') {
     echo json_encode(['status' => 'success', 'new_total' => $new_total, 'user_vote' => $new_user_vote]);
     exit;
 }
+
 // === CONCORDÂNCIA VIA AJAX ===
 elseif ($action === 'agreement_ajax') {
     header('Content-Type: application/json');
@@ -50,9 +50,8 @@ elseif ($action === 'agreement_ajax') {
 
     $user_id = $_SESSION['user_id'];
     $ans_id = (int)$_POST['ans_id'];
-    $val = (int)$_POST['val']; // 1 (Concordo) ou -1 (Discordo)
+    $val = (int)$_POST['val'];
 
-    // Lógica de Toggle/Update/Insert
     $stmt = $pdo->prepare("SELECT agreement_type FROM answer_agreements WHERE user_id = ? AND answer_id = ?");
     $stmt->execute([$user_id, $ans_id]);
     $existing = $stmt->fetch();
@@ -61,18 +60,15 @@ elseif ($action === 'agreement_ajax') {
     if ($existing) {
         $old_val = (int)$existing['agreement_type'];
         if ($old_val === $val) {
-            // Remove o voto se clicar de novo
             $pdo->prepare("DELETE FROM answer_agreements WHERE user_id = ? AND answer_id = ?")->execute([$user_id, $ans_id]);
             $pdo->prepare("UPDATE answers SET agreement = agreement - ? WHERE id = ?")->execute([$old_val, $ans_id]);
         } else {
-            // Inverte o voto
             $pdo->prepare("UPDATE answer_agreements SET agreement_type = ? WHERE user_id = ? AND answer_id = ?")->execute([$val, $user_id, $ans_id]);
             $diff = $val - $old_val;
             $pdo->prepare("UPDATE answers SET agreement = agreement + ? WHERE id = ?")->execute([$diff, $ans_id]);
             $new_user_agreement = $val;
         }
     } else {
-        // Novo voto
         $pdo->prepare("INSERT INTO answer_agreements (user_id, answer_id, agreement_type) VALUES (?, ?, ?)")->execute([$user_id, $ans_id, $val]);
         $pdo->prepare("UPDATE answers SET agreement = agreement + ? WHERE id = ?")->execute([$val, $ans_id]);
         $new_user_agreement = $val;
@@ -121,16 +117,25 @@ elseif ($action === 'answer_ajax') {
                 </div>
             </div>
             <div class="mb-3 text-dark"><?= nl2br(htmlspecialchars($body)) ?></div>
-            <div class="d-flex align-items-center">
+
+            <div class="d-flex align-items-center flex-wrap gap-2">
                 <div class="bg-light rounded-pill border px-2 d-flex align-items-center">
                     <button id="btn-up-<?= $new_ans_id ?>" onclick="vote(<?= $new_ans_id ?>, 1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-arrow-up"></i></button>
-                    <span id="vote-count-<?= $new_ans_id ?>" class="fw-bold mx-1 text-dark small">0</span>
+                    <span id="vote-count-<?= $new_ans_id ?>" class="fw-bold mx-2 text-dark small">0</span>
                     <button id="btn-down-<?= $new_ans_id ?>" onclick="vote(<?= $new_ans_id ?>, -1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-arrow-down"></i></button>
                 </div>
-                <button class="btn btn-sm text-secondary fw-bold ms-3" onclick="document.getElementById('root-reply-form-<?= $new_ans_id ?>').classList.toggle('d-none')">
+
+                <div class="bg-light rounded-pill border px-2 d-flex align-items-center">
+                    <button id="btn-agree-<?= $new_ans_id ?>" onclick="agree(<?= $new_ans_id ?>, 1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-check"></i></button>
+                    <span id="agree-count-<?= $new_ans_id ?>" class="fw-bold mx-2 text-dark small">0</span>
+                    <button id="btn-disagree-<?= $new_ans_id ?>" onclick="agree(<?= $new_ans_id ?>, -1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-times"></i></button>
+                </div>
+
+                <button class="btn btn-sm text-secondary fw-bold ms-2" onclick="document.getElementById('root-reply-form-<?= $new_ans_id ?>').classList.toggle('d-none')">
                     <i class="far fa-comment"></i> Responder
                 </button>
             </div>
+
             <div id="root-reply-form-<?= $new_ans_id ?>" class="d-none mt-3 p-3 bg-light rounded">
                 <form onsubmit="submitAnswer(event, this)">
                     <input type="hidden" name="action" value="answer_ajax">
@@ -154,14 +159,23 @@ elseif ($action === 'answer_ajax') {
             <span class="text-muted small ms-2" style="font-size: 0.75rem;">Agora</span>
         </div>
         <div class="text-dark small mb-2" style="line-height: 1.5;"><?= nl2br(htmlspecialchars($body)) ?></div>
-        <div class="d-flex align-items-center mb-2">
-            <div class="bg-light rounded-pill border px-2 d-flex align-items-center me-2" style="transform: scale(0.9); transform-origin: left center;">
+
+        <div class="d-flex align-items-center mb-2 flex-wrap gap-2">
+            <div class="bg-light rounded-pill border px-2 d-flex align-items-center" style="transform: scale(0.9); transform-origin: left center;">
                 <button id="btn-up-<?= $new_ans_id ?>" onclick="vote(<?= $new_ans_id ?>, 1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-arrow-up"></i></button>
                 <span id="vote-count-<?= $new_ans_id ?>" class="fw-bold mx-2 text-dark small">0</span>
                 <button id="btn-down-<?= $new_ans_id ?>" onclick="vote(<?= $new_ans_id ?>, -1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-arrow-down"></i></button>
             </div>
-            <button class="btn btn-sm text-muted fw-bold p-0 small" onclick="document.getElementById('reply-form-<?= $new_ans_id ?>').classList.toggle('d-none')">Responder</button>
+
+            <div class="bg-light rounded-pill border px-2 d-flex align-items-center" style="transform: scale(0.9); transform-origin: left center;">
+                <button id="btn-agree-<?= $new_ans_id ?>" onclick="agree(<?= $new_ans_id ?>, 1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-check"></i></button>
+                <span id="agree-count-<?= $new_ans_id ?>" class="fw-bold mx-2 text-dark small">0</span>
+                <button id="btn-disagree-<?= $new_ans_id ?>" onclick="agree(<?= $new_ans_id ?>, -1)" class="btn btn-sm btn-link p-0 text-secondary" style="border:none;"><i class="fas fa-times"></i></button>
+            </div>
+
+            <button class="btn btn-sm text-muted fw-bold p-0 small ms-2" onclick="document.getElementById('reply-form-<?= $new_ans_id ?>').classList.toggle('d-none')">Responder</button>
         </div>
+
         <div id="reply-form-<?= $new_ans_id ?>" class="d-none ms-1 mt-2 mb-3">
             <form onsubmit="submitAnswer(event, this)">
                 <input type="hidden" name="action" value="answer_ajax">
@@ -209,9 +223,14 @@ elseif ($action === 'login') {
 
 } elseif ($action === 'create_question') {
     if (!isset($_SESSION['user_id'])) die("403");
-    $stmt = $pdo->prepare("INSERT INTO questions (user_id, sig_id, title, body) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$_SESSION['user_id'], $_POST['sig_id'], $_POST['title'], $_POST['body']]);
-    header("Location: index.php");
+    // Captura post_type, padrão 'question'
+    $post_type = isset($_POST['post_type']) ? $_POST['post_type'] : 'question';
+
+    $stmt = $pdo->prepare("INSERT INTO questions (user_id, sig_id, title, body, post_type) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$_SESSION['user_id'], $_POST['sig_id'], $_POST['title'], $_POST['body'], $post_type]);
+
+    $redirect = $_POST['redirect'] ?? "index.php";
+    header("Location: " . $redirect);
 
 } elseif ($action === 'join_sig' || $action === 'leave_sig') {
     if (!isset($_SESSION['user_id'])) die("403");
