@@ -43,6 +43,48 @@ if ($action === 'vote_ajax') {
     echo json_encode(['status' => 'success', 'new_total' => $new_total, 'user_vote' => $new_user_vote]);
     exit;
 }
+// === CONCORDÂNCIA VIA AJAX ===
+elseif ($action === 'agreement_ajax') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) { echo json_encode(['status' => 'error', 'message' => 'Login necessário']); exit; }
+
+    $user_id = $_SESSION['user_id'];
+    $ans_id = (int)$_POST['ans_id'];
+    $val = (int)$_POST['val']; // 1 (Concordo) ou -1 (Discordo)
+
+    // Lógica de Toggle/Update/Insert
+    $stmt = $pdo->prepare("SELECT agreement_type FROM answer_agreements WHERE user_id = ? AND answer_id = ?");
+    $stmt->execute([$user_id, $ans_id]);
+    $existing = $stmt->fetch();
+    $new_user_agreement = 0;
+
+    if ($existing) {
+        $old_val = (int)$existing['agreement_type'];
+        if ($old_val === $val) {
+            // Remove o voto se clicar de novo
+            $pdo->prepare("DELETE FROM answer_agreements WHERE user_id = ? AND answer_id = ?")->execute([$user_id, $ans_id]);
+            $pdo->prepare("UPDATE answers SET agreement = agreement - ? WHERE id = ?")->execute([$old_val, $ans_id]);
+        } else {
+            // Inverte o voto
+            $pdo->prepare("UPDATE answer_agreements SET agreement_type = ? WHERE user_id = ? AND answer_id = ?")->execute([$val, $user_id, $ans_id]);
+            $diff = $val - $old_val;
+            $pdo->prepare("UPDATE answers SET agreement = agreement + ? WHERE id = ?")->execute([$diff, $ans_id]);
+            $new_user_agreement = $val;
+        }
+    } else {
+        // Novo voto
+        $pdo->prepare("INSERT INTO answer_agreements (user_id, answer_id, agreement_type) VALUES (?, ?, ?)")->execute([$user_id, $ans_id, $val]);
+        $pdo->prepare("UPDATE answers SET agreement = agreement + ? WHERE id = ?")->execute([$val, $ans_id]);
+        $new_user_agreement = $val;
+    }
+
+    $stmt = $pdo->prepare("SELECT agreement FROM answers WHERE id = ?");
+    $stmt->execute([$ans_id]);
+    $new_total = $stmt->fetchColumn();
+
+    echo json_encode(['status' => 'success', 'new_total' => $new_total, 'user_agreement' => $new_user_agreement]);
+    exit;
+}
 
 // === RESPOSTA VIA AJAX (RENDERIZAÇÃO CONDICIONAL) ===
 elseif ($action === 'answer_ajax') {
