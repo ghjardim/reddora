@@ -45,12 +45,19 @@ $commands = [
         parent_id INTEGER DEFAULT NULL,
         body TEXT,
         votes INTEGER DEFAULT 0,
+        agreement INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )",
     "CREATE TABLE answer_votes (
         user_id INTEGER,
         answer_id INTEGER,
         vote_type INTEGER,
+        PRIMARY KEY (user_id, answer_id)
+    )",
+    "CREATE TABLE answer_agreements (
+        user_id INTEGER,
+        answer_id INTEGER,
+        agreement_type INTEGER,
         PRIMARY KEY (user_id, answer_id)
     )"
 ];

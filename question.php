@@ -11,9 +11,19 @@ $stmt->execute([$q_id]);
 $question = $stmt->fetch();
 if (!$question) die("Pergunta não encontrada.");
 
-// Respostas
-$stmt = $pdo->prepare("SELECT a.*, u.username, v.vote_type as user_vote FROM answers a JOIN users u ON a.user_id = u.id LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ? WHERE a.question_id = ? ORDER BY a.votes DESC, a.created_at ASC");
-$stmt->execute([$user_id, $q_id]);
+// Respostas (AGORA COM AGREEMENT e USER_AGREEMENT)
+$stmt = $pdo->prepare("
+    SELECT a.*, u.username,
+           v.vote_type as user_vote,
+           ag.agreement_type as user_agreement
+    FROM answers a
+    JOIN users u ON a.user_id = u.id
+    LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ?
+    LEFT JOIN answer_agreements ag ON a.id = ag.answer_id AND ag.user_id = ?
+    WHERE a.question_id = ?
+    ORDER BY a.votes DESC, a.created_at ASC
+");
+$stmt->execute([$user_id, $user_id, $q_id]);
 $all_answers = $stmt->fetchAll();
 
 $comments_by_parent = [];
@@ -34,14 +44,23 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
                     <span class="text-muted small ms-2" style="font-size:0.75rem;"><?= date('d M', strtotime($ans['created_at'])) ?></span>
                 </div>
                 <div class="text-dark small mb-2" style="line-height:1.5;"><?= nl2br(htmlspecialchars($ans['body'])) ?></div>
-                <div class="d-flex align-items-center mb-2">
-                    <div class="bg-light rounded-pill border px-2 d-flex align-items-center me-2" style="transform:scale(0.9); transform-origin:left;">
+
+                <div class="d-flex align-items-center mb-2 flex-wrap gap-2">
+                    <div class="bg-light rounded-pill border px-2 d-flex align-items-center" style="transform:scale(0.9); transform-origin:left;" title="Avalie a qualidade técnica/relevância">
                         <button id="btn-up-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, 1)" class="btn btn-sm btn-link p-0 <?= $ans['user_vote']==1?'text-success':'text-secondary' ?>" style="border:none;"><i class="fas fa-arrow-up"></i></button>
                         <span id="vote-count-<?= $ans_id ?>" class="fw-bold mx-2 text-dark small"><?= $ans['votes'] ?></span>
                         <button id="btn-down-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, -1)" class="btn btn-sm btn-link p-0 <?= $ans['user_vote']==-1?'text-danger':'text-secondary' ?>" style="border:none;"><i class="fas fa-arrow-down"></i></button>
                     </div>
+
+                    <div class="bg-light rounded-pill border px-2 d-flex align-items-center" style="transform:scale(0.9); transform-origin:left;" title="Você concorda com esta opinião?">
+                        <button id="btn-agree-<?= $ans_id ?>" onclick="agree(<?= $ans_id ?>, 1)" class="btn btn-sm btn-link p-0 <?= $ans['user_agreement']==1?'text-primary':'text-secondary' ?>" style="border:none;"><i class="fas fa-check"></i></button>
+                        <span id="agree-count-<?= $ans_id ?>" class="fw-bold mx-2 text-dark small"><?= isset($ans['agreement']) ? $ans['agreement'] : 0 ?></span>
+                        <button id="btn-disagree-<?= $ans_id ?>" onclick="agree(<?= $ans_id ?>, -1)" class="btn btn-sm btn-link p-0 <?= $ans['user_agreement']==-1?'text-warning':'text-secondary' ?>" style="border:none;"><i class="fas fa-times"></i></button>
+                    </div>
+
                     <button class="btn btn-sm text-muted fw-bold p-0 small" onclick="document.getElementById('reply-form-<?= $ans_id ?>').classList.toggle('d-none')">Responder</button>
                 </div>
+
                 <div id="reply-form-<?= $ans_id ?>" class="d-none ms-1 mt-2 mb-3">
                     <form onsubmit="submitAnswer(event, this)">
                         <input type="hidden" name="action" value="answer_ajax">
@@ -142,14 +161,23 @@ function count_children($parent_id, $comments_by_parent) {
                                         </div>
                                     </div>
                                     <div class="mb-3 text-dark"><?= nl2br(htmlspecialchars($root_ans['body'])) ?></div>
-                                    <div class="d-flex align-items-center">
-                                        <div class="bg-light rounded-pill border px-2 d-flex align-items-center">
-                                            <button id="btn-up-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, 1)" class="btn btn-sm <?= $root_ans['user_vote']==1?'text-success':'text-secondary' ?> fw-bold border-0"><i class="fas fa-arrow-up"></i></button>
-                                            <span id="vote-count-<?= $ans_id ?>" class="fw-bold mx-1 text-dark"><?= $root_ans['votes'] ?></span>
-                                            <button id="btn-down-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, -1)" class="btn btn-sm <?= $root_ans['user_vote']==-1?'text-danger':'text-secondary' ?> border-0"><i class="fas fa-arrow-down"></i></button>
+
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <div class="bg-light rounded-pill border px-2 d-flex align-items-center" title="Avalie a qualidade técnica/relevância">
+                                            <button id="btn-up-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, 1)" class="btn btn-sm btn-link p-0 <?= $root_ans['user_vote']==1?'text-success':'text-secondary' ?>" style="border:none;"><i class="fas fa-arrow-up"></i></button>
+                                            <span id="vote-count-<?= $ans_id ?>" class="fw-bold mx-2 text-dark small"><?= $root_ans['votes'] ?></span>
+                                            <button id="btn-down-<?= $ans_id ?>" onclick="vote(<?= $ans_id ?>, -1)" class="btn btn-sm btn-link p-0 <?= $root_ans['user_vote']==-1?'text-danger':'text-secondary' ?>" style="border:none;"><i class="fas fa-arrow-down"></i></button>
                                         </div>
-                                        <button class="btn btn-sm text-secondary fw-bold ms-3" onclick="document.getElementById('root-reply-form-<?= $ans_id ?>').classList.toggle('d-none')"><i class="far fa-comment"></i> Responder</button>
+
+                                        <div class="bg-light rounded-pill border px-2 d-flex align-items-center" title="Você concorda com esta opinião?">
+                                            <button id="btn-agree-<?= $ans_id ?>" onclick="agree(<?= $ans_id ?>, 1)" class="btn btn-sm btn-link p-0 <?= $root_ans['user_agreement']==1?'text-primary':'text-secondary' ?>" style="border:none;"><i class="fas fa-check"></i></button>
+                                            <span id="agree-count-<?= $ans_id ?>" class="fw-bold mx-2 text-dark small"><?= isset($root_ans['agreement']) ? $root_ans['agreement'] : 0 ?></span>
+                                            <button id="btn-disagree-<?= $ans_id ?>" onclick="agree(<?= $ans_id ?>, -1)" class="btn btn-sm btn-link p-0 <?= $root_ans['user_agreement']==-1?'text-warning':'text-secondary' ?>" style="border:none;"><i class="fas fa-times"></i></button>
+                                        </div>
+
+                                        <button class="btn btn-sm text-secondary fw-bold ms-2" onclick="document.getElementById('root-reply-form-<?= $ans_id ?>').classList.toggle('d-none')"><i class="far fa-comment"></i> Responder</button>
                                     </div>
+
                                     <div id="root-reply-form-<?= $ans_id ?>" class="d-none mt-3 p-3 bg-light rounded">
                                         <form onsubmit="submitAnswer(event, this)">
                                             <input type="hidden" name="action" value="answer_ajax">
@@ -219,6 +247,30 @@ function count_children($parent_id, $comments_by_parent) {
                 down.className = `btn btn-sm btn-link p-0 ${d.user_vote==-1?'text-danger':'text-secondary'}`;
             }
         });
+    }
+
+    // NOVA FUNÇÃO: Concordância (Agreement)
+    function agree(id, val) {
+        let fd = new FormData();
+        fd.append('action', 'agreement_ajax');
+        fd.append('ans_id', id);
+        fd.append('val', val);
+
+        fetch('post_action.php', {method: 'POST', body: fd})
+        .then(r => r.json())
+        .then(d => {
+            if(d.status === 'success'){
+                document.getElementById('agree-count-'+id).innerText = d.new_total;
+                let agreeBtn = document.getElementById('btn-agree-'+id);
+                let disagreeBtn = document.getElementById('btn-disagree-'+id);
+
+                agreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==1?'text-primary':'text-secondary'}`;
+                disagreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==-1?'text-warning':'text-secondary'}`;
+            } else {
+                if(d.message) alert(d.message);
+            }
+        })
+        .catch(e => console.error(e));
     }
     </script>
 </body>
