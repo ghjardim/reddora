@@ -9,7 +9,6 @@ if (!isset($_GET['id'])) {
 $sig_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
-// Função para renderizar as badges de tipo
 function getPostBadge($type) {
     switch($type) {
         case 'post': return '<span class="badge bg-success text-white border me-1"><i class="fas fa-file-alt"></i> Ensaio</span>';
@@ -49,17 +48,18 @@ $questions = $stmt->fetchAll();
     <title>s/<?= htmlspecialchars($sig['name']) ?> - Reddora</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+    <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
     <link rel="stylesheet" href="style.css">
     <style>
-        .read-more-link {
-            cursor: pointer;
-            font-size: 0.9em;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .read-more-link:hover {
-            text-decoration: underline;
-        }
+        .read-more-link { cursor: pointer; font-size: 0.9em; text-decoration: none; font-weight: bold; }
+        .read-more-link:hover { text-decoration: underline; }
+        .markdown-content img { max-width: 100%; height: auto; border-radius: 8px; }
+        .markdown-content pre { background: #f8f9fa; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
     </style>
 </head>
 <body>
@@ -125,7 +125,7 @@ $questions = $stmt->fetchAll();
                                     <option value="short">⚡ Curto</option>
                                 </select>
                                 <input type="text" name="title" class="form-control mb-2 fw-bold" placeholder="Título interessante..." required>
-                                <textarea name="body" class="form-control mb-2" placeholder="O que pretendes partilhar?" rows="2"></textarea>
+                                <textarea name="body" id="sigEditor" class="form-control mb-2" placeholder="O que pretendes partilhar? (Markdown suportado)" rows="2"></textarea>
 
                                 <div class="text-end">
                                     <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">Publicar</button>
@@ -175,15 +175,15 @@ $questions = $stmt->fetchAll();
                                 $short_body = mb_substr($full_body, 0, $limit, 'UTF-8') . '...';
                             ?>
                                 <span id="short-text-<?= $q_id ?>">
-                                    <?= nl2br(htmlspecialchars($short_body)) ?>
+                                    <span class="markdown-content d-inline"><?= htmlspecialchars($short_body) ?></span>
                                     <a class="read-more-link text-primary" onclick="togglePost(<?= $q_id ?>)">Ler mais</a>
                                 </span>
                                 <span id="full-text-<?= $q_id ?>" class="d-none">
-                                    <?= nl2br(htmlspecialchars($full_body)) ?>
+                                    <span class="markdown-content d-inline"><?= htmlspecialchars($full_body) ?></span>
                                     <a class="read-more-link text-secondary" onclick="togglePost(<?= $q_id ?>)">Ler menos</a>
                                 </span>
                             <?php else: ?>
-                                <?= nl2br(htmlspecialchars($full_body)) ?>
+                                <div class="markdown-content"><?= htmlspecialchars($full_body) ?></div>
                             <?php endif; ?>
                         </div>
 
@@ -200,6 +200,24 @@ $questions = $stmt->fetchAll();
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Inicia EasyMDE
+    const sigEditorEl = document.getElementById('sigEditor');
+    if(sigEditorEl) {
+        new EasyMDE({
+            element: sigEditorEl,
+            spellChecker: false,
+            status: false,
+            toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "image", "preview"]
+        });
+    }
+
+    // Renderiza Markdown
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll('.markdown-content').forEach(el => {
+            el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
+        });
+    });
+
     function togglePost(id) {
         const shortText = document.getElementById('short-text-' + id);
         const fullText = document.getElementById('full-text-' + id);

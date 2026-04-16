@@ -3,7 +3,6 @@
 require 'db.php';
 
 // === 1. LIMPEZA TOTAL ===
-// ADICIONADO: answer_agreements
 $tables = ['answer_agreements', 'answer_votes', 'answers', 'questions', 'sig_memberships', 'sigs', 'users'];
 foreach ($tables as $table) {
     $pdo->exec("DROP TABLE IF EXISTS $table");
@@ -83,14 +82,12 @@ function createSig($pdo, $name, $desc) {
     return $pdo->lastInsertId();
 }
 
-// Atualizado para suportar post_type
 function createQuestion($pdo, $uid, $sid, $title, $body, $post_type = 'question') {
     $stmt = $pdo->prepare("INSERT INTO questions (user_id, sig_id, title, body, post_type) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$uid, $sid, $title, $body, $post_type]);
     return $pdo->lastInsertId();
 }
 
-// Atualizado para suportar agreement
 function createAnswer($pdo, $qid, $uid, $body, $votes = 0, $agreement = 0, $pid = null) {
     $stmt = $pdo->prepare("INSERT INTO answers (question_id, user_id, parent_id, body, votes, agreement) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->execute([$qid, $uid, $pid, $body, $votes, $agreement]);
@@ -131,58 +128,85 @@ joinSig($pdo, $u_felipe, $s_genz); joinSig($pdo, $u_felipe, $s_ds);
 joinSig($pdo, $u_renato, $s_ds); joinSig($pdo, $u_renato, $s_psi); joinSig($pdo, $u_renato, $s_random);
 
 
-// === 5. CONTEÚDO DENSO ===
+// === 5. CONTEÚDO DENSO (AGORA COM MARKDOWN E POST TYPES) ===
 
 // ---------------------------------------------------------
 // THREAD 1: Data Science (Tipo: question)
 // ---------------------------------------------------------
-$body_q1 = "Estou a liderar um projeto de migração de dados numa fintech e a minha equipa técnica está num impasse ideológico.\n\nMetade dos engenheiros quer continuar a usar Pandas (v2.0 com PyArrow backend). A outra metade quer migrar tudo para Polars ou PySpark local. A minha dúvida é sobre o ROI desta refatoração.\n\nO custo de reescrever a base de código realmente compensa o ganho de performance?";
+$body_q1 = "Estou a liderar um projeto de migração de dados numa fintech e a minha equipa técnica está num impasse ideológico.
 
-$q1 = createQuestion($pdo, $u_sofia, $s_ds, 'Pandas vs Polars em 2025: O custo de refatoração vale a pena?', $body_q1, 'question');
+Metade dos engenheiros quer continuar a usar **Pandas (v2.0 com PyArrow backend)** pela familiaridade e ecossistema. Porém, estamos a lidar com dumps diários de Parquet que já excedem 50GB. A máquina de desenvolvimento padrão tem 32GB de RAM, o que causa *OOM (Out of Memory)* constantemente se não processarmos em chunks.
 
-    $ans1 = "Fizemos exatamente essa migração no trimestre passado. A resposta curta é: SIM, compensa, e rápido.\n\nO Polars mudou o nosso jogo. O Pandas, mesmo com PyArrow, ainda tem um overhead significativo.";
-    createAnswer($pdo, $q1, $u_admin, $ans1, 45, 30); // 45 Karma, 30 Agreement
+A outra metade quer migrar tudo para **Polars** ou **PySpark** local. A minha dúvida é sobre o ROI desta refatoração.
 
-    createAnswer($pdo, $q1, $u_renato, "Cuidado com o 'hype driven development'. Se a sua equipa inteira é fluente em Pandas, o tempo que vão perder a aprender a API do Polars pode sair mais caro que alugar uma máquina com mais RAM.", 12, -5); // 12 Karma, -5 Agreement
+> O custo de reescrever a base de código (refatoração de milhares de linhas de ETL) realmente compensa o ganho de performance e redução de infraestrutura?
+
+Alguém tem benchmarks reais de produção comparando o custo de horas/homem da migração versus a economia na AWS?";
+
+$q1 = createQuestion($pdo, $u_sofia, $s_ds, 'Pandas vs Polars em 2025: O custo de refatoração vale a pena para datasets médios (50GB+)?', $body_q1, 'question');
+
+    $ans1 = "Fizemos exatamente essa migração na minha empresa no trimestre passado. A resposta curta é: **SIM, compensa, e rápido.**\n\nNão é apenas sobre 'caber na memória'. O Polars, por ser escrito em Rust e usar execução preguiçosa (*lazy evaluation*) e otimização de *query plan*, mudou o nosso jogo. O Pandas, mesmo com PyArrow, ainda tem um *overhead* significativo de gestão de memória e não paraleliza operações nativamente como o Polars.\n\n**O nosso cenário:** ETL que levava 4 horas no Pandas passou a rodar em 20 minutos com Polars streaming mode.";
+    createAnswer($pdo, $q1, $u_admin, $ans1, 45, 30);
+
+    createAnswer($pdo, $q1, $u_renato, "Cuidado com o *hype driven development*. Estão a olhar apenas para o benchmark de execução e a esquecer o custo de manutenção.\n\nSe a vossa equipa inteira é fluente em Pandas, o tempo que vão perder a aprender as idiossincrasias da API do Polars pode sair mais caro que simplesmente alugar uma máquina com 128GB de RAM na AWS.", 12, -5);
 
 
 // ---------------------------------------------------------
-// THREAD 2: Neurodiversidade (Tipo: post)
+// THREAD 2: Neurodiversidade (Tipo: question)
 // ---------------------------------------------------------
-$body_q2 = "Fui diagnosticado com TDAH do tipo misto tardiamente, aos 28 anos. \n\nO que sinto não é apenas alívio, é um luto profundo pelo 'eu potencial'. Quero partilhar convosco que esse sentimento é normal. Não existe 'quem poderíamos ter sido'. A pessoa que somos hoje, com todas as nossas defesas e hiperfocos, é o que importa. A medicação não apaga quem somos, apenas nos dá os óculos que sempre precisámos.";
+$body_q2 = "Fui diagnosticado com **TDAH do tipo misto** tardiamente, aos 28 anos, na semana passada. Desde então, sinto um misto avassalador de alívio e luto profundo.
 
-$q2 = createQuestion($pdo, $u_admin, $s_neuro, 'Sobre o diagnóstico tardio e o luto do "eu potencial"', $body_q2, 'post');
+* **Alívio** por finalmente entender porque perdi tantas chaves, perdi prazos na faculdade e sempre me senti 'mais burro' ou 'preguiçoso' que os meus pares, mesmo esforçando-me o dobro.
+* **Luto** por pensar 'quem eu poderia ter sido' se tivesse sido tratado na infância ou adolescência. Quantas oportunidades perdi? Quantas relações estraguei por impulsividade?
 
-    $ans2 = "Isto está incrivelmente bem escrito. Chamamos a isso de 'Luto pelo Eu Idealizado' na clínica. É um processo de desconstrução brutal mas necessário.";
-    $a2 = createAnswer($pdo, $q2, $u_julia, $ans2, 89, 80);
+Alguém mais passou por isso? Como lidar com esta sensação de 'tempo perdido' e aceitar o diagnóstico na vida adulta sem se vitimizar?";
 
-        createAnswer($pdo, $q2, $u_dani, "Obrigado por partilharem isto. Fez-me chorar aqui, é exatamente o que estou a passar.", 34, 30, $a2);
+$q2 = createQuestion($pdo, $u_admin, $s_neuro, 'Diagnóstico tardio de TDAH: Como lidar com o luto do "eu potencial"?', $body_q2, 'question');
+
+    $ans2 = "Olá. O que estás a sentir é validado clinicamente e extremamente comum. Chamamos a isso de **'Luto pelo Eu Idealizado'**.\n\nÉ um processo de desconstrução. Passaste 28 anos a construir uma autoimagem baseada em falhas morais ('sou preguiçoso', 'sou desatento'), quando na verdade lidavas com uma deficiência executiva não tratada.\n\n> Não existe 'quem poderias ter sido'. \n\nA pessoa que és hoje, com a tua criatividade, resiliência e mecanismos de *coping* (que desenvolveste sozinho para sobreviver!), é resultado dessa jornada.";
+    $a2 = createAnswer($pdo, $q2, $u_julia, $ans2, 89, 85);
+
+        createAnswer($pdo, $q2, $u_dani, "Julia, o teu comentário fez-me chorar aqui. É exatamente isso.\n\nOP, eu recebi o meu laudo aos 30. A raiva passa. O que fica é a compaixão pela tua 'criança interior' que sofreu sem saber porquê.", 34, 30, $a2);
 
 
 // ---------------------------------------------------------
 // THREAD 3: Gen Z (Tipo: post)
 // ---------------------------------------------------------
-$body_q3 = "O 'quiet quitting' não é preguiça geracional, é pura autodefesa económica. Os nossos pais compravam casas com um salário médio. Hoje, esse salário mal paga uma renda. Fazer apenas o que está no contrato é a única resposta racional a um contrato social que foi quebrado.";
+$body_q3 = "Vejo muitos artigos no LinkedIn e críticas de gerações anteriores a dizer que a Gen Z 'não quer trabalhar' ou que inventámos o *Quiet Quitting* por preguiça.
 
-$q3 = createQuestion($pdo, $u_felipe, $s_genz, 'Matemática do Quiet Quitting: Porque é que vestir a camisola não compensa', $body_q3, 'post');
+Mas vamos aos números:
+1. Os meus pais compraram uma casa de 3 quartos e sustentavam 2 filhos com um salário de gerente médio nos anos 90.
+2. Hoje, o mesmo salário mal paga a renda de um estúdio no centro e a inflação dos bens alimentares.
 
-    $ans3 = "Do ponto de vista de dados macroeconómicos, estás absolutamente correto. A lealdade é punida financeiramente hoje em dia.";
-    createAnswer($pdo, $q3, $u_sofia, $ans3, 120, 100);
+O **quiet quitting** (fazer apenas o que está no contrato) não é apenas uma resposta racional de mercado a um contrato social que foi quebrado? Porque deveríamos 'vestir a camisola' e trabalhar 60h semanais se o prémio (estabilidade e património) já não existe?";
 
-    createAnswer($pdo, $q3, $u_renato, "Uma tese muito bem estruturada, mas continuo a discordar da premissa. O mercado pune quem faz o mínimo, independente da conjuntura. Estão a romantizar a falta de ambição.", 50, -40); // Exemplo perfeito: Alto Karma (bem argumentado), Baixo Agreement (opinião impopular)
+$q3 = createQuestion($pdo, $u_felipe, $s_genz, 'O "Quiet Quitting" é preguiça geracional ou autodefesa económica?', $body_q3, 'post');
+
+    $ans3 = "É autodefesa, pura e simples, baseada em dados macroeconómicos. O contrato social antigo era: *'Dá lealdade à corporação e a corporação cuidará de ti com carreira e reforma'*. Isso morreu efetivamente na crise de 2008.\n\nHoje, a estatística mostra que a 'lealdade' é punida financeiramente, enquanto quem faz *job hopping* (troca de emprego a cada 2 anos) consegue aumentos reais significativos.";
+    $a3 = createAnswer($pdo, $q3, $u_sofia, $ans3, 120, 100);
+
+    createAnswer($pdo, $q3, $u_renato, "Uma tese muito bem estruturada, mas continuo a discordar da premissa. O mercado pune quem faz o mínimo, independente da geração ou da 'conjuntura económica'. Quem se destaca cresce. Quem faz *quiet quitting* será o primeiro a ser despedido no próximo layoff.", 50, -40);
 
 
 // ---------------------------------------------------------
 // THREAD 4: Papos Aleatórios (Tipo: short)
 // ---------------------------------------------------------
-$body_q4 = "Massa com queijo > Sushi. Apenas factos.";
+$body_q4 = "Estou num debate acalorado aqui em casa e preciso de opiniões externas. Se tivessem de escolher **APENAS UMA** culinária nacional para comer pelo resto da vida (pequeno-almoço, almoço, jantar), qual seria?
 
-$q4 = createQuestion($pdo, $u_admin, $s_random, 'Verdades difíceis de engolir', $body_q4, 'short');
+**Regras:**
+* Tem que ser variada o suficiente para não enjoar.
+* Tem que ser saudável o suficiente para não fazer mal.
+* Valem todas as variações regionais.";
 
-    createAnswer($pdo, $q4, $u_felipe, "Discordo totalmente, a cozinha asiática dá 10-0 a qualquer prato pesado de queijo.", 5, -10);
+$q4 = createQuestion($pdo, $u_admin, $s_random, 'Qual a melhor culinária do mundo para viver exclusivamente dela?', $body_q4, 'short');
+
+    createAnswer($pdo, $q4, $u_felipe, "Japonesa, sem dúvidas. E não estou a falar só de sushi.\n\nEles têm *curries*, lámen, grelhados. É extremamente equilibrada, baseada em peixes e vegetais.", 20, 15);
+
+    $ans4 = "Italiana. E não aceito discussões contrárias.\n\nMas calma, não a italiana comercial. Falo da dieta mediterrânea real: azeite, tomates frescos, frutos do mar e massa fresca. Viver sem um bom queijo e vinho não é viver, é apenas sobreviver.";
+    createAnswer($pdo, $q4, $u_julia, $ans4, 45, 40);
 
 
-echo "<h3>5. Conteúdo estendido (com Posts e Shorts) gerado com sucesso!</h3>";
+echo "<h3>5. Conteúdo denso gerado com sucesso!</h3>";
 echo "<p class='lead'>Base de dados restaurada. Password de todos: 123</p>";
 echo "<hr>";
 echo "<a href='login.php' style='display:inline-block; background: #b92b27; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight:bold;'>Ir para Login</a>";

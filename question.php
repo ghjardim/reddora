@@ -5,7 +5,6 @@ if (!isset($_GET['id'])) die("<div class='alert alert-danger'>Erro: ID necessár
 $q_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
-// Função para renderizar as badges de tipo
 function getPostBadge($type) {
     switch($type) {
         case 'post': return '<span class="badge bg-success text-white border me-2"><i class="fas fa-file-alt"></i> Ensaio</span>';
@@ -20,7 +19,7 @@ $stmt->execute([$q_id]);
 $question = $stmt->fetch();
 if (!$question) die("Publicação não encontrada.");
 
-// Respostas (COM AGREEMENT e USER_AGREEMENT)
+// Respostas
 $stmt = $pdo->prepare("
     SELECT a.*, u.username,
            v.vote_type as user_vote,
@@ -50,7 +49,8 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
                     <a href="profile.php?id=<?= $ans['user_id'] ?>" class="fw-bold text-dark text-decoration-none small"><?= htmlspecialchars($ans['username']) ?></a>
                     <span class="text-muted small ms-2" style="font-size:0.75rem;"><?= date('d M', strtotime($ans['created_at'])) ?></span>
                 </div>
-                <div class="text-dark small mb-2" style="line-height:1.5;"><?= nl2br(htmlspecialchars($ans['body'])) ?></div>
+
+                <div class="markdown-content text-dark small mb-2" style="line-height:1.5;"><?= htmlspecialchars($ans['body']) ?></div>
 
                 <div class="d-flex align-items-center mb-2 flex-wrap gap-2">
                     <div class="bg-light rounded-pill border px-2 d-flex align-items-center" style="transform:scale(0.9); transform-origin:left;" title="Avalie a qualidade técnica/relevância">
@@ -73,7 +73,7 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
                         <input type="hidden" name="action" value="answer_ajax">
                         <input type="hidden" name="question_id" value="<?= $q_id ?>">
                         <input type="hidden" name="parent_id" value="<?= $ans_id ?>">
-                        <textarea name="body" class="form-control form-control-sm mb-1" rows="2" placeholder="Sua resposta..."></textarea>
+                        <textarea name="body" class="form-control form-control-sm mb-1" rows="2" placeholder="Sua resposta (Markdown suportado)..."></textarea>
                         <button class="btn btn-primary btn-sm py-0 px-3">Enviar</button>
                     </form>
                 </div>
@@ -99,6 +99,12 @@ function count_children($parent_id, $comments_by_parent) {
     <title><?= htmlspecialchars($question['title']) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+    <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
     <link rel="stylesheet" href="style.css">
     <style>
         .question-body { font-size: 1.1rem; line-height: 1.6; color: #2c3e50; }
@@ -107,6 +113,10 @@ function count_children($parent_id, $comments_by_parent) {
         .thread-line:hover { border-left-color: #ced4da; }
         .fade-in-comment { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .markdown-content img { max-width: 100%; height: auto; border-radius: 8px; }
+        .markdown-content pre { background: #f8f9fa; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
+        .markdown-content blockquote { border-left: 4px solid #dee2e6; padding-left: 1rem; color: #6c757d; }
     </style>
 </head>
 <body>
@@ -131,7 +141,7 @@ function count_children($parent_id, $comments_by_parent) {
                             <span class="text-muted small">u/<?= htmlspecialchars($question['username']) ?> &bull; <?= date('d/m/Y', strtotime($question['created_at'])) ?></span>
                         </div>
                         <h1 class="fw-bold mb-4 text-dark" style="font-size:1.75rem;"><?= htmlspecialchars($question['title']) ?></h1>
-                        <div class="question-body mb-4"><?= nl2br(htmlspecialchars($question['body'])) ?></div>
+                        <div class="markdown-content question-body mb-4"><?= htmlspecialchars($question['body']) ?></div>
                     </div>
                 </div>
 
@@ -150,7 +160,7 @@ function count_children($parent_id, $comments_by_parent) {
                             <input type="hidden" name="action" value="answer_ajax">
                             <input type="hidden" name="question_id" value="<?= $q_id ?>">
                             <label class="form-label small fw-bold text-muted">Sua resposta</label>
-                            <textarea name="body" class="form-control mb-2" rows="4" placeholder="Adicione à discussão..."></textarea>
+                            <textarea name="body" id="mainAnsEditor" class="form-control mb-2" rows="4" placeholder="Adicione à discussão..."></textarea>
                             <div class="text-end"><button class="btn btn-primary px-4 fw-bold">Postar</button></div>
                         </form>
                     </div>
@@ -168,7 +178,7 @@ function count_children($parent_id, $comments_by_parent) {
                                             <small class="text-muted"><?= date('d M', strtotime($root_ans['created_at'])) ?></small>
                                         </div>
                                     </div>
-                                    <div class="mb-3 text-dark"><?= nl2br(htmlspecialchars($root_ans['body'])) ?></div>
+                                    <div class="markdown-content mb-3 text-dark"><?= htmlspecialchars($root_ans['body']) ?></div>
 
                                     <div class="d-flex align-items-center flex-wrap gap-2">
                                         <div class="bg-light rounded-pill border px-2 d-flex align-items-center" title="Avalie a qualidade técnica/relevância">
@@ -191,7 +201,7 @@ function count_children($parent_id, $comments_by_parent) {
                                             <input type="hidden" name="action" value="answer_ajax">
                                             <input type="hidden" name="question_id" value="<?= $q_id ?>">
                                             <input type="hidden" name="parent_id" value="<?= $ans_id ?>">
-                                            <textarea name="body" class="form-control mb-2" rows="2"></textarea>
+                                            <textarea name="body" class="form-control mb-2" rows="2" placeholder="Sua resposta (Markdown)..."></textarea>
                                             <button class="btn btn-primary btn-sm">Enviar</button>
                                         </form>
                                     </div>
@@ -213,8 +223,40 @@ function count_children($parent_id, $comments_by_parent) {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Inicializa o Editor no formulário principal de resposta
+    let mdeInstance = null;
+    const ansTextarea = document.getElementById('mainAnsEditor');
+    if (ansTextarea) {
+        mdeInstance = new EasyMDE({
+            element: ansTextarea,
+            spellChecker: false,
+            status: false,
+            toolbar: ["bold", "italic", "quote", "|", "unordered-list", "ordered-list", "|", "preview"]
+        });
+    }
+
+    // Processa o Markdown
+    function parseMarkdown() {
+        document.querySelectorAll('.markdown-content').forEach(el => {
+            // Verifica se já foi parseado para não parsear duas vezes
+            if (!el.dataset.parsed) {
+                el.innerHTML = DOMPurify.sanitize(marked.parse(el.textContent));
+                el.dataset.parsed = true;
+            }
+        });
+    }
+
+    // Roda na primeira carga
+    document.addEventListener("DOMContentLoaded", parseMarkdown);
+
     function submitAnswer(e, form) {
         e.preventDefault();
+
+        // Se for o formulário principal, joga o texto do EasyMDE pra textarea
+        if (form.querySelector('textarea').id === 'mainAnsEditor' && mdeInstance) {
+            form.querySelector('textarea').value = mdeInstance.value();
+        }
+
         let btn = form.querySelector('button');
         let txt = btn.innerText;
         btn.innerText = '...'; btn.disabled = true;
@@ -225,18 +267,18 @@ function count_children($parent_id, $comments_by_parent) {
             btn.innerText=txt; btn.disabled=false;
             if(d.status==='success') {
                 form.querySelector('textarea').value='';
+                if(mdeInstance) mdeInstance.value(''); // limpa o editor se usado
                 if(!form.closest('#mainReplyForm')) form.parentElement.classList.add('d-none');
 
-                // Lógica de Inserção Simplificada
                 let pid = new FormData(form).get('parent_id');
-                // Se tem PID, vai pro container do pai. Se não, vai pro container raiz (0)
                 let targetId = pid ? 'replies-container-'+pid : 'replies-container-0';
                 let container = document.getElementById(targetId);
 
                 if(container) {
                     let div = document.createElement('div');
                     div.innerHTML = d.html;
-                    container.prepend(div.firstElementChild); // Insere no topo
+                    container.prepend(div.firstElementChild);
+                    parseMarkdown(); // Aplica o markdown na resposta nova
                 } else {
                     location.reload();
                 }
@@ -257,28 +299,17 @@ function count_children($parent_id, $comments_by_parent) {
         });
     }
 
-    // Função: Concordância (Agreement)
     function agree(id, val) {
-        let fd = new FormData();
-        fd.append('action', 'agreement_ajax');
-        fd.append('ans_id', id);
-        fd.append('val', val);
-
-        fetch('post_action.php', {method: 'POST', body: fd})
-        .then(r => r.json())
-        .then(d => {
+        let fd = new FormData(); fd.append('action', 'agreement_ajax'); fd.append('ans_id', id); fd.append('val', val);
+        fetch('post_action.php', {method: 'POST', body: fd}).then(r => r.json()).then(d => {
             if(d.status === 'success'){
                 document.getElementById('agree-count-'+id).innerText = d.new_total;
                 let agreeBtn = document.getElementById('btn-agree-'+id);
                 let disagreeBtn = document.getElementById('btn-disagree-'+id);
-
                 agreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==1?'text-primary':'text-secondary'}`;
                 disagreeBtn.className = `btn btn-sm btn-link p-0 ${d.user_agreement==-1?'text-warning':'text-secondary'}`;
-            } else {
-                if(d.message) alert(d.message);
             }
-        })
-        .catch(e => console.error(e));
+        });
     }
     </script>
 </body>
