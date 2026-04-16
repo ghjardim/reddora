@@ -67,11 +67,19 @@ $feed_items = $stmt->fetchAll();
         .markdown-content blockquote { border-left: 4px solid #dee2e6; padding-left: 1rem; color: #6c757d; }
     </style>
 </head>
-<body>
+<body class="bg-light">
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
+
+            <form action="search.php" method="GET" class="mx-auto d-none d-md-flex" style="max-width: 400px; width: 100%;">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar na Reddora..." required>
+                    <button class="btn btn-light text-primary fw-bold px-3" type="submit"><i class="fas fa-search"></i></button>
+                </div>
+            </form>
+
             <div class="d-flex align-items-center">
                 <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white text-decoration-none me-3">
                     <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?>
@@ -109,7 +117,7 @@ $feed_items = $stmt->fetchAll();
             </div>
 
             <div class="col-md-7">
-                <div class="card mb-4">
+                <div class="card mb-4 shadow-sm border-0">
                     <div class="card-body d-flex align-items-center bg-white rounded">
                         <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-3 text-muted" style="width: 40px; height: 40px;">
                             <i class="fas fa-pen"></i>
@@ -150,7 +158,7 @@ $feed_items = $stmt->fetchAll();
                     $limit = 280;
                     $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
                 ?>
-                <div class="card mb-3 hover-card">
+                <div class="card mb-3 hover-card border-0 shadow-sm">
                     <div class="card-body pb-2">
                         <div class="mb-2 text-muted small d-flex align-items-center">
                             <?= getPostBadge($item['post_type']) ?>
@@ -161,7 +169,7 @@ $feed_items = $stmt->fetchAll();
                         </div>
 
                         <h5 class="mb-3">
-                            <a href="question.php?id=<?= $item['question_id'] ?>" class="question-link text-dark" style="position: relative; z-index: 2;">
+                            <a href="question.php?id=<?= $item['question_id'] ?>" class="question-link text-dark fw-bold" style="position: relative; z-index: 2;">
                                 <?= htmlspecialchars($item['question_title']) ?>
                             </a>
                         </h5>

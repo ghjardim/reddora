@@ -119,10 +119,19 @@ function count_children($parent_id, $comments_by_parent) {
         .markdown-content blockquote { border-left: 4px solid #dee2e6; padding-left: 1rem; color: #6c757d; }
     </style>
 </head>
-<body>
+<body class="bg-light">
+
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
+
+            <form action="search.php" method="GET" class="mx-auto d-none d-md-flex" style="max-width: 400px; width: 100%;">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar na Reddora..." required>
+                    <button class="btn btn-light text-primary fw-bold px-3" type="submit"><i class="fas fa-search"></i></button>
+                </div>
+            </form>
+
             <div class="d-flex align-items-center">
                 <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white me-3 text-decoration-none"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?></a>
                 <a href="index.php" class="btn btn-sm btn-outline-light opacity-75">Feed</a>
@@ -133,7 +142,7 @@ function count_children($parent_id, $comments_by_parent) {
     <div class="container mb-5">
         <div class="row">
             <div class="col-md-8 mx-auto">
-                <div class="card main-question-card border-0 mb-5">
+                <div class="card main-question-card border-0 shadow-sm mb-5">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center mb-3">
                             <?= getPostBadge($question['post_type']) ?>

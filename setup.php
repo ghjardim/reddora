@@ -3,7 +3,8 @@
 require 'db.php';
 
 // === 1. LIMPEZA TOTAL ===
-$tables = ['answer_agreements', 'answer_votes', 'answers', 'questions', 'sig_memberships', 'sigs', 'users'];
+// ADICIONADO: questions_fts
+$tables = ['answer_agreements', 'answer_votes', 'answers', 'questions_fts', 'questions', 'sig_memberships', 'sigs', 'users'];
 foreach ($tables as $table) {
     $pdo->exec("DROP TABLE IF EXISTS $table");
 }
@@ -60,13 +61,33 @@ $commands = [
         answer_id INTEGER,
         agreement_type INTEGER,
         PRIMARY KEY (user_id, answer_id)
-    )"
+    )",
+
+    // === TABELA VIRTUAL DE PESQUISA (BM25) ===
+    "CREATE VIRTUAL TABLE questions_fts USING fts5(
+        title,
+        body,
+        content='questions',
+        content_rowid='id'
+    )",
+
+    // === TRIGGERS PARA MANTER A PESQUISA SINCRONIZADA ===
+    "CREATE TRIGGER questions_ai AFTER INSERT ON questions BEGIN
+        INSERT INTO questions_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
+    END",
+    "CREATE TRIGGER questions_ad AFTER DELETE ON questions BEGIN
+        INSERT INTO questions_fts(questions_fts, rowid, title, body) VALUES('delete', old.id, old.title, old.body);
+    END",
+    "CREATE TRIGGER questions_au AFTER UPDATE ON questions BEGIN
+        INSERT INTO questions_fts(questions_fts, rowid, title, body) VALUES('delete', old.id, old.title, old.body);
+        INSERT INTO questions_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
+    END"
 ];
 
 foreach ($commands as $cmd) {
     $pdo->exec($cmd);
 }
-echo "<h3>2. Tabelas recriadas (com Post Types, Karma e Concordância).</h3>";
+echo "<h3>2. Tabelas recriadas (com Post Types, Karma, Concordância e Busca BM25).</h3>";
 
 // === 3. FUNÇÕES AUXILIARES ===
 function createUser($pdo, $name, $bio) {
@@ -82,12 +103,14 @@ function createSig($pdo, $name, $desc) {
     return $pdo->lastInsertId();
 }
 
+// Atualizado para suportar post_type
 function createQuestion($pdo, $uid, $sid, $title, $body, $post_type = 'question') {
     $stmt = $pdo->prepare("INSERT INTO questions (user_id, sig_id, title, body, post_type) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$uid, $sid, $title, $body, $post_type]);
     return $pdo->lastInsertId();
 }
 
+// Atualizado para suportar agreement
 function createAnswer($pdo, $qid, $uid, $body, $votes = 0, $agreement = 0, $pid = null) {
     $stmt = $pdo->prepare("INSERT INTO answers (question_id, user_id, parent_id, body, votes, agreement) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->execute([$qid, $uid, $pid, $body, $votes, $agreement]);
@@ -128,7 +151,7 @@ joinSig($pdo, $u_felipe, $s_genz); joinSig($pdo, $u_felipe, $s_ds);
 joinSig($pdo, $u_renato, $s_ds); joinSig($pdo, $u_renato, $s_psi); joinSig($pdo, $u_renato, $s_random);
 
 
-// === 5. CONTEÚDO DENSO (AGORA COM MARKDOWN E POST TYPES) ===
+// === 5. CONTEÚDO DENSO (AGORA COM MARKDOWN E POST TYPES E INDEXADO NO FTS5) ===
 
 // ---------------------------------------------------------
 // THREAD 1: Data Science (Tipo: question)
@@ -206,7 +229,7 @@ $q4 = createQuestion($pdo, $u_admin, $s_random, 'Qual a melhor culinária do mun
     createAnswer($pdo, $q4, $u_julia, $ans4, 45, 40);
 
 
-echo "<h3>5. Conteúdo denso gerado com sucesso!</h3>";
+echo "<h3>5. Conteúdo denso gerado com sucesso! O motor de busca BM25 está ativo.</h3>";
 echo "<p class='lead'>Base de dados restaurada. Password de todos: 123</p>";
 echo "<hr>";
 echo "<a href='login.php' style='display:inline-block; background: #b92b27; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight:bold;'>Ir para Login</a>";
