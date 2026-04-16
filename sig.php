@@ -62,11 +62,19 @@ $questions = $stmt->fetchAll();
         .markdown-content pre { background: #f8f9fa; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
     </style>
 </head>
-<body>
+<body class="bg-light">
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
+
+            <form action="search.php" method="GET" class="mx-auto d-none d-md-flex" style="max-width: 400px; width: 100%;">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar na Reddora..." required>
+                    <button class="btn btn-light text-primary fw-bold px-3" type="submit"><i class="fas fa-search"></i></button>
+                </div>
+            </form>
+
             <div class="d-flex align-items-center">
                 <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white text-decoration-none me-3">
                     <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?>
@@ -154,7 +162,7 @@ $questions = $stmt->fetchAll();
                     $limit = 200; // Limite de caracteres para preview
                     $is_long = mb_strlen($full_body, 'UTF-8') > $limit;
                 ?>
-                <div class="card mb-3 hover-card">
+                <div class="card mb-3 border-0 shadow-sm hover-card">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center text-muted small mb-2">
                             <div class="d-flex align-items-center">
@@ -164,8 +172,8 @@ $questions = $stmt->fetchAll();
                             <span><?= date('d/m H:i', strtotime($q['created_at'])) ?></span>
                         </div>
 
-                        <h4 class="card-title h5 mb-2">
-                            <a href="question.php?id=<?= $q['id'] ?>" class="question-link text-dark">
+                        <h4 class="card-title h5 mb-2 fw-bold">
+                            <a href="question.php?id=<?= $q['id'] ?>" class="text-dark text-decoration-none">
                                 <?= htmlspecialchars($q['title']) ?>
                             </a>
                         </h4>
