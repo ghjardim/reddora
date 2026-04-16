@@ -13,13 +13,26 @@ function getPostBadge($type) {
     }
 }
 
-// Pergunta
+// 1. Busca a Pergunta Atual
 $stmt = $pdo->prepare("SELECT q.*, s.name as sig_name, u.username FROM questions q JOIN sigs s ON q.sig_id = s.id JOIN users u ON q.user_id = u.id WHERE q.id = ?");
 $stmt->execute([$q_id]);
 $question = $stmt->fetch();
 if (!$question) die("Publicação não encontrada.");
 
-// Respostas
+// 2. Busca Mais Publicações do Mesmo Autor (Excluindo a atual)
+$stmt = $pdo->prepare("
+    SELECT id, title, post_type, created_at,
+    (SELECT COUNT(*) FROM answers WHERE question_id = questions.id) as answer_count,
+    (SELECT COALESCE(SUM(votes), 0) FROM answers WHERE question_id = questions.id) as total_score
+    FROM questions
+    WHERE user_id = ? AND id != ?
+    ORDER BY created_at DESC
+    LIMIT 3
+");
+$stmt->execute([$question['user_id'], $q_id]);
+$more_from_user = $stmt->fetchAll();
+
+// 3. Busca as Respostas do Post Atual
 $stmt = $pdo->prepare("
     SELECT a.*, u.username,
            v.vote_type as user_vote,
@@ -96,7 +109,7 @@ function count_children($parent_id, $comments_by_parent) {
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title><?= htmlspecialchars($question['title']) ?></title>
+    <title><?= htmlspecialchars($question['title']) ?> - Reddora</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
@@ -227,7 +240,44 @@ function count_children($parent_id, $comments_by_parent) {
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
-            </div>
+
+                <div class="mt-5 mb-5 pt-4 border-top">
+                    <h5 class="fw-bold text-dark mb-4">Mais de u/<?= htmlspecialchars($question['username']) ?></h5>
+
+                    <?php if (!empty($more_from_user)): ?>
+                        <div class="row">
+                            <?php foreach($more_from_user as $mfu): ?>
+                            <div class="col-12 mb-3">
+                                <div class="card border-0 shadow-sm hover-card h-100">
+                                    <div class="card-body py-3">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <?= getPostBadge($mfu['post_type']) ?>
+                                            <small class="text-muted ms-2"><?= date('d/m/Y', strtotime($mfu['created_at'])) ?></small>
+                                        </div>
+                                        <h6 class="fw-bold mb-2">
+                                            <a href="question.php?id=<?= $mfu['id'] ?>" class="text-dark text-decoration-none">
+                                                <?= htmlspecialchars($mfu['title']) ?>
+                                            </a>
+                                        </h6>
+                                        <div class="d-flex align-items-center text-muted small">
+                                            <span class="badge bg-light text-dark border me-3" title="Karma total deste post">
+                                                <i class="fas fa-arrow-up text-success me-1"></i> <?= $mfu['total_score'] ?>
+                                            </span>
+                                            <span><i class="far fa-comments me-1"></i> <?= $mfu['answer_count'] ?> discussões</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-light text-center border shadow-sm text-muted py-4">
+                            <i class="fas fa-file-signature fa-2x mb-3 opacity-50"></i><br>
+                            Este utilizador não tem outras publicações.
+                        </div>
+                    <?php endif; ?>
+                </div>
+                </div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
