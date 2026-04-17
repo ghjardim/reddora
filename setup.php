@@ -3,8 +3,8 @@
 require 'db.php';
 
 // === 1. LIMPEZA TOTAL ===
-// ADICIONADO: questions_fts, question_votes, question_agreements
-$tables = ['answer_agreements', 'answer_votes', 'answers', 'question_agreements', 'question_votes', 'questions_fts', 'questions', 'sig_memberships', 'sigs', 'users'];
+// ADICIONADO: questions_fts, question_votes, question_agreements, answers_fts
+$tables = ['answer_agreements', 'answer_votes', 'answers_fts', 'answers', 'question_agreements', 'question_votes', 'questions_fts', 'questions', 'sig_memberships', 'sigs', 'users'];
 foreach ($tables as $table) {
     $pdo->exec("DROP TABLE IF EXISTS $table");
 }
@@ -79,7 +79,7 @@ $commands = [
         PRIMARY KEY (user_id, answer_id)
     )",
 
-    // === TABELA VIRTUAL DE PESQUISA (BM25) ===
+    // === TABELA VIRTUAL DE PESQUISA (BM25) - PERGUNTAS ===
     "CREATE VIRTUAL TABLE questions_fts USING fts5(
         title,
         body,
@@ -87,7 +87,7 @@ $commands = [
         content_rowid='id'
     )",
 
-    // === TRIGGERS PARA MANTER A PESQUISA SINCRONIZADA ===
+    // === TRIGGERS PARA MANTER A PESQUISA SINCRONIZADA - PERGUNTAS ===
     "CREATE TRIGGER questions_ai AFTER INSERT ON questions BEGIN
         INSERT INTO questions_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
     END",
@@ -97,13 +97,32 @@ $commands = [
     "CREATE TRIGGER questions_au AFTER UPDATE ON questions BEGIN
         INSERT INTO questions_fts(questions_fts, rowid, title, body) VALUES('delete', old.id, old.title, old.body);
         INSERT INTO questions_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
+    END",
+
+    // === TABELA VIRTUAL DE PESQUISA (BM25) - RESPOSTAS ===
+    "CREATE VIRTUAL TABLE answers_fts USING fts5(
+        body,
+        content='answers',
+        content_rowid='id'
+    )",
+
+    // === TRIGGERS PARA MANTER A PESQUISA SINCRONIZADA - RESPOSTAS ===
+    "CREATE TRIGGER answers_ai AFTER INSERT ON answers BEGIN
+        INSERT INTO answers_fts(rowid, body) VALUES (new.id, new.body);
+    END",
+    "CREATE TRIGGER answers_ad AFTER DELETE ON answers BEGIN
+        INSERT INTO answers_fts(answers_fts, rowid, body) VALUES('delete', old.id, old.body);
+    END",
+    "CREATE TRIGGER answers_au AFTER UPDATE ON answers BEGIN
+        INSERT INTO answers_fts(answers_fts, rowid, body) VALUES('delete', old.id, old.body);
+        INSERT INTO answers_fts(rowid, body) VALUES (new.id, new.body);
     END"
 ];
 
 foreach ($commands as $cmd) {
     $pdo->exec($cmd);
 }
-echo "<h3>2. Tabelas recriadas (com Post Types, Karma e Concordância no post principal, e Busca BM25).</h3>";
+echo "<h3>2. Tabelas recriadas (com Post Types, Karma, Concordância e Busca BM25 para Perguntas e Respostas).</h3>";
 
 // === 3. FUNÇÕES AUXILIARES ===
 function createUser($pdo, $name, $bio) {
@@ -120,7 +139,6 @@ function createSig($pdo, $name, $desc) {
 }
 
 function createQuestion($pdo, $uid, $sid, $title, $body, $post_type = 'question') {
-    // Agora inicializa com 0 votos e 0 concordância
     $stmt = $pdo->prepare("INSERT INTO questions (user_id, sig_id, title, body, post_type, votes, agreement) VALUES (?, ?, ?, ?, ?, 0, 0)");
     $stmt->execute([$uid, $sid, $title, $body, $post_type]);
     return $pdo->lastInsertId();
@@ -186,7 +204,7 @@ $q4 = createQuestion($pdo, $u_admin, $s_random, 'Qual a melhor culinária do mun
     $ans4 = "Italiana. E não aceito discussões contrárias.\n\nMas calma, não a italiana comercial. Falo da dieta mediterrânea real: azeite, tomates frescos, frutos do mar e massa fresca. Viver sem um bom queijo e vinho não é viver, é apenas sobreviver.";
     createAnswer($pdo, $q4, $u_julia, $ans4, 45, 40);
 
-echo "<h3>5. Conteúdo denso gerado com sucesso! O motor de busca BM25 está ativo.</h3>";
+echo "<h3>5. Conteúdo denso gerado com sucesso! O motor de busca BM25 está ativo para Perguntas e Respostas.</h3>";
 echo "<p class='lead'>Base de dados restaurada. Password de todos: 123</p>";
 echo "<hr>";
 echo "<a href='login.php' style='display:inline-block; background: #b92b27; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight:bold;'>Ir para Login</a>";
