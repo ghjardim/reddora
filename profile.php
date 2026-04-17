@@ -16,8 +16,8 @@ $profile_id = (int)$_GET['id'];
 $active_tab = $_GET['tab'] ?? 'all';
 $current_user_id = $_SESSION['user_id'];
 
-// 1. Busca Usuário (Agora incluindo profile_pic)
-$stmt = $pdo->prepare("SELECT username, created_at, profile_pic FROM users WHERE id = ?");
+// 1. Busca Usuário (Agora incluindo real_name e profile_pic)
+$stmt = $pdo->prepare("SELECT username, real_name, created_at, profile_pic FROM users WHERE id = ?");
 $stmt->execute([$profile_id]);
 $profile_user = $stmt->fetch();
 if (!$profile_user) die("Usuário não encontrado.");
@@ -138,8 +138,15 @@ function getPostBadge($type) {
                 </div>
 
                 <div>
-                    <h2 class="mb-1 fw-bold"><?= htmlspecialchars($profile_user['username']) ?></h2>
-                    <p class="mb-0 opacity-75">
+                    <h2 class="mb-0 fw-bold">
+                        <?= !empty($profile_user['real_name']) ? htmlspecialchars($profile_user['real_name']) : htmlspecialchars($profile_user['username']) ?>
+                    </h2>
+
+                    <?php if (!empty($profile_user['real_name'])): ?>
+                        <p class="mb-1 text-light opacity-75 fw-bold" style="font-size: 0.95rem;">@<?= htmlspecialchars($profile_user['username']) ?></p>
+                    <?php endif; ?>
+
+                    <p class="mb-0 opacity-75 small">
                         <i class="far fa-calendar-alt me-1"></i> Membro desde <?= date('d/m/Y', strtotime($profile_user['created_at'])) ?>
                     </p>
                 </div>

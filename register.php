@@ -19,10 +19,17 @@
 
         <form action="post_action.php" method="POST">
             <input type="hidden" name="action" value="register">
+
+            <div class="mb-3">
+                <label class="form-label text-muted small fw-bold text-uppercase">Nome Real (Opcional)</label>
+                <input type="text" name="real_name" class="form-control" placeholder="Ex: João Silva">
+            </div>
+
             <div class="mb-3">
                 <label class="form-label text-muted small fw-bold text-uppercase">Usuário</label>
                 <input type="text" name="username" class="form-control" required>
             </div>
+
             <div class="mb-3">
                 <label class="form-label text-muted small fw-bold text-uppercase">Senha</label>
                 <input type="password" name="password" class="form-control" required>

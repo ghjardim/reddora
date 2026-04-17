@@ -325,10 +325,10 @@ elseif ($action === 'login') {
     $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
     $stmt->execute([$_POST['username']]);
     if ($stmt->fetch()) { header("Location: register.php?error=exists"); exit; }
-
     $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
-    $stmt->execute([$_POST['username'], $hash]);
+    $real_name = !empty(trim($_POST['real_name'])) ? trim($_POST['real_name']) : NULL;
+    $stmt = $pdo->prepare("INSERT INTO users (username, real_name, password) VALUES (?, ?, ?)");
+    $stmt->execute([$_POST['username'], $real_name, $hash]);
     $pdo->exec("INSERT INTO sig_memberships (user_id, sig_id) VALUES (" . $pdo->lastInsertId() . ", 1)");
     header("Location: login.php?registered=1");
 

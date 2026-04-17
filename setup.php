@@ -3,7 +3,6 @@
 require 'db.php';
 
 // === 1. LIMPEZA TOTAL ===
-// ADICIONADO: questions_fts, question_votes, question_agreements, answers_fts
 $tables = ['answer_agreements', 'answer_votes', 'answers_fts', 'answers', 'question_agreements', 'question_votes', 'questions_fts', 'questions', 'sig_memberships', 'sigs', 'users'];
 foreach ($tables as $table) {
     $pdo->exec("DROP TABLE IF EXISTS $table");
@@ -17,9 +16,10 @@ $commands = [
     "CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
+        real_name TEXT DEFAULT NULL,     /* NOVA COLUNA: Nome Real */
         password TEXT,
         bio TEXT,
-        profile_pic TEXT DEFAULT NULL,
+        profile_pic TEXT DEFAULT NULL,   /* NOVA COLUNA: Foto de Perfil */
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )",
     "CREATE TABLE sigs (
@@ -39,11 +39,10 @@ $commands = [
         title TEXT,
         body TEXT,
         post_type TEXT DEFAULT 'question',
-        votes INTEGER DEFAULT 0,          /* NOVA COLUNA: Karma no Post Principal */
-        agreement INTEGER DEFAULT 0,      /* NOVA COLUNA: Concordância no Post Principal */
+        votes INTEGER DEFAULT 0,
+        agreement INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )",
-    // Novas tabelas para o Post Principal
     "CREATE TABLE question_votes (
         user_id INTEGER,
         question_id INTEGER,
@@ -56,15 +55,14 @@ $commands = [
         agreement_type INTEGER,
         PRIMARY KEY (user_id, question_id)
     )",
-    // Tabelas das Respostas (mantidas como estavam)
     "CREATE TABLE answers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         question_id INTEGER,
         user_id INTEGER,
         parent_id INTEGER DEFAULT NULL,
         body TEXT,
-        votes INTEGER DEFAULT 0,          /* Karma (Qualidade) */
-        agreement INTEGER DEFAULT 0,      /* Concordância */
+        votes INTEGER DEFAULT 0,
+        agreement INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )",
     "CREATE TABLE answer_votes (
@@ -123,13 +121,14 @@ $commands = [
 foreach ($commands as $cmd) {
     $pdo->exec($cmd);
 }
-echo "<h3>2. Tabelas recriadas (com Post Types, Karma, Concordância e Busca BM25 para Perguntas e Respostas).</h3>";
+echo "<h3>2. Tabelas recriadas (com Post Types, Karma, Concordância, Busca BM25, Nomes Reais e Fotos de Perfil).</h3>";
 
 // === 3. FUNÇÕES AUXILIARES ===
-function createUser($pdo, $name, $bio) {
+// A função createUser agora aceita $real_name
+function createUser($pdo, $username, $real_name, $bio) {
     $pass = password_hash('123', PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, bio) VALUES (?, ?, ?)");
-    $stmt->execute([$name, $pass, $bio]);
+    $stmt = $pdo->prepare("INSERT INTO users (username, real_name, password, bio) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$username, $real_name, $pass, $bio]);
     return $pdo->lastInsertId();
 }
 
@@ -156,14 +155,15 @@ function joinSig($pdo, $uid, $sid) {
 }
 
 // === 4. POPULANDO DADOS ===
-$u_admin   = createUser($pdo, 'admin', 'Administrador do Sistema | Mod');
-$u_sofia   = createUser($pdo, 'Sofia_Data', 'Data Scientist Sênior | Python & Big Data');
-$u_julia   = createUser($pdo, 'Julia_Psy', 'Psicóloga Clínica (TCC) | Especialista em Ansiedade');
-$u_dani    = createUser($pdo, 'Dani_Neuro', 'Ativista da Neurodiversidade | TDAH & Autismo');
-$u_felipe  = createUser($pdo, 'Felipe_GenZ', 'Front-end Dev | Entusiasta de Tech & Memes');
-$u_renato  = createUser($pdo, 'Renato_Ceticismo', 'Engenheiro Civil | Cético Profissional');
+// Passando o "Nome Real" para cada utilizador
+$u_admin   = createUser($pdo, 'admin', 'Administrador', 'Administrador do Sistema | Mod');
+$u_sofia   = createUser($pdo, 'Sofia_Data', 'Sofia Martins', 'Data Scientist Sênior | Python & Big Data');
+$u_julia   = createUser($pdo, 'Julia_Psy', 'Júlia Costa', 'Psicóloga Clínica (TCC) | Especialista em Ansiedade');
+$u_dani    = createUser($pdo, 'Dani_Neuro', 'Daniela Alves', 'Ativista da Neurodiversidade | TDAH & Autismo');
+$u_felipe  = createUser($pdo, 'Felipe_GenZ', 'Felipe Santos', 'Front-end Dev | Entusiasta de Tech & Memes');
+$u_renato  = createUser($pdo, 'Renato_Ceticismo', 'Renato Silva', 'Engenheiro Civil | Cético Profissional');
 
-echo "<h3>3. Utilizadores criados com Bios.</h3>";
+echo "<h3>3. Utilizadores criados com Nomes Reais e Bios.</h3>";
 
 $s_ds      = createSig($pdo, 'Data Science', 'Python, R, IA, Estatística e Big Data.');
 $s_psi     = createSig($pdo, 'Psicologia', 'Mente humana, comportamento e terapia.');
