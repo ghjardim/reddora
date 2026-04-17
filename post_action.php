@@ -274,6 +274,43 @@ elseif ($action === 'answer_ajax') {
 }
 
 // === OUTRAS AÇÕES ===
+
+// --- UPLOAD DE FOTO DE PERFIL ---
+elseif ($action === 'upload_pfp') {
+    if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+
+    $user_id = $_SESSION['user_id'];
+
+    if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath = $_FILES['profile_pic']['tmp_name'];
+        $fileName = $_FILES['profile_pic']['name'];
+        $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+        $allowedfileExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        if (in_array($fileExtension, $allowedfileExtensions)) {
+            // Cria a pasta se não existir
+            $uploadFileDir = './uploads/profiles/';
+            if (!is_dir($uploadFileDir)) {
+                mkdir($uploadFileDir, 0755, true);
+            }
+
+            // Gera um nome único para evitar conflitos de cache
+            $newFileName = 'pfp_' . $user_id . '_' . time() . '.' . $fileExtension;
+            $dest_path = $uploadFileDir . $newFileName;
+
+            if (move_uploaded_file($fileTmpPath, $dest_path)) {
+                // Atualiza a base de dados com o novo nome
+                $stmt = $pdo->prepare("UPDATE users SET profile_pic = ? WHERE id = ?");
+                $stmt->execute([$newFileName, $user_id]);
+            }
+        }
+    }
+    // Redireciona de volta para o perfil
+    header("Location: profile.php?id=" . $user_id);
+    exit;
+}
+
 elseif ($action === 'login') {
     $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $stmt->execute([$_POST['username']]);
