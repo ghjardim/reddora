@@ -10,11 +10,17 @@ if ($query !== '') {
     // Adiciona o asterisco para permitir correspondência de prefixo (ex: pesqui* encontra pesquisa, pesquisar)
     $search_term = $query . '*';
 
-    // A mágica FTS5 BM25
+    // A mágica FTS5 BM25 usando UNION ALL (une resultados de perguntas e de respostas)
     $stmt = $pdo->prepare("
-        SELECT 
-            q.*, 
-            s.name as sig_name, 
+        SELECT
+            'question' as result_type,
+            q.id as question_id,
+            q.id as item_id,
+            q.title,
+            q.body,
+            q.post_type,
+            s.name as sig_name,
+            s.id as sig_id,
             u.username,
             (SELECT COUNT(*) FROM answers a WHERE a.question_id = q.id) as answer_count,
             fts.rank as bm25_score
@@ -22,11 +28,33 @@ if ($query !== '') {
         JOIN questions q ON fts.rowid = q.id
         JOIN sigs s ON q.sig_id = s.id
         JOIN users u ON q.user_id = u.id
-        WHERE questions_fts MATCH ?
-        ORDER BY fts.rank ASC /* rank negativo = mais relevante */
+        WHERE questions_fts MATCH :search
+
+        UNION ALL
+
+        SELECT
+            'answer' as result_type,
+            q.id as question_id,
+            a.id as item_id,
+            q.title,
+            a.body,
+            'answer' as post_type,
+            s.name as sig_name,
+            s.id as sig_id,
+            u.username,
+            0 as answer_count,
+            fts.rank as bm25_score
+        FROM answers_fts fts
+        JOIN answers a ON fts.rowid = a.id
+        JOIN questions q ON a.question_id = q.id
+        JOIN sigs s ON q.sig_id = s.id
+        JOIN users u ON a.user_id = u.id
+        WHERE answers_fts MATCH :search
+
+        ORDER BY bm25_score ASC
         LIMIT 50
     ");
-    $stmt->execute([$search_term]);
+    $stmt->execute(['search' => $search_term]);
     $results = $stmt->fetchAll();
 }
 
@@ -34,6 +62,7 @@ function getPostBadge($type) {
     switch($type) {
         case 'post': return '<span class="badge bg-success text-white border me-1"><i class="fas fa-file-alt"></i> Ensaio</span>';
         case 'short': return '<span class="badge bg-warning text-dark border me-1"><i class="fas fa-bolt"></i> Curto</span>';
+        case 'answer': return '<span class="badge bg-info text-dark border me-1"><i class="fas fa-reply"></i> Resposta</span>';
         default: return '<span class="badge bg-primary text-white border me-1"><i class="fas fa-question-circle"></i> Pergunta</span>';
     }
 }
@@ -52,7 +81,7 @@ function getPostBadge($type) {
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
-            
+
             <form action="search.php" method="GET" class="mx-auto d-none d-md-flex" style="max-width: 400px; width: 100%;">
                 <div class="input-group input-group-sm">
                     <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar na Reddora..." value="<?= htmlspecialchars($query) ?>" required>
@@ -76,7 +105,7 @@ function getPostBadge($type) {
         <div class="row">
             <div class="col-md-8 mx-auto">
                 <h4 class="mb-4 fw-bold">Resultados para "<?= htmlspecialchars($query) ?>"</h4>
-                
+
                 <?php if (empty($results) && $query !== ''): ?>
                     <div class="alert alert-light border text-center p-5 shadow-sm text-muted">
                         <i class="fas fa-search fa-3x mb-3 opacity-50"></i><br>
@@ -98,8 +127,8 @@ function getPostBadge($type) {
                         </div>
 
                         <h5 class="card-title fw-bold mb-2">
-                            <a href="question.php?id=<?= $q['id'] ?>" class="text-dark text-decoration-none">
-                                <?= htmlspecialchars($q['title']) ?>
+                            <a href="question.php?id=<?= $q['question_id'] ?>" class="text-dark text-decoration-none">
+                                <?= $q['result_type'] === 'answer' ? 'Re: ' : '' ?><?= htmlspecialchars($q['title']) ?>
                             </a>
                         </h5>
 
@@ -107,8 +136,8 @@ function getPostBadge($type) {
                             <?= htmlspecialchars(mb_substr(strip_tags($q['body']), 0, 200, 'UTF-8')) ?>...
                         </div>
 
-                        <a href="question.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
-                            <i class="far fa-comments me-1"></i> Ir para Discussão (<?= $q['answer_count'] ?>)
+                        <a href="question.php?id=<?= $q['question_id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
+                            <i class="far fa-comments me-1"></i> Ir para Discussão <?= $q['result_type'] === 'question' ? '(' . $q['answer_count'] . ')' : '' ?>
                         </a>
                     </div>
                 </div>
