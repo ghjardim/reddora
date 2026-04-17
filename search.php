@@ -123,7 +123,6 @@ function getPostBadge($type) {
                                 <span class="mx-2">&bull;</span>
                                 <span>u/<?= htmlspecialchars($q['username']) ?></span>
                             </div>
-                            <span class="badge bg-light text-muted border" title="Pontuação de relevância do motor de pesquisa">BM25 Score: <?= round(abs($q['bm25_score']), 2) ?></span>
                         </div>
 
                         <h5 class="card-title fw-bold mb-2">
