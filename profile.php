@@ -16,8 +16,8 @@ $profile_id = (int)$_GET['id'];
 $active_tab = $_GET['tab'] ?? 'all';
 $current_user_id = $_SESSION['user_id'];
 
-// 1. Busca Usuário
-$stmt = $pdo->prepare("SELECT username, created_at FROM users WHERE id = ?");
+// 1. Busca Usuário (Agora incluindo profile_pic)
+$stmt = $pdo->prepare("SELECT username, created_at, profile_pic FROM users WHERE id = ?");
 $stmt->execute([$profile_id]);
 $profile_user = $stmt->fetch();
 if (!$profile_user) die("Usuário não encontrado.");
@@ -128,16 +128,29 @@ function getPostBadge($type) {
     <div class="container mb-5">
 
         <div class="card shadow-sm mb-4 border-0" style="background: linear-gradient(135deg, var(--reddora-dark) 0%, #34495e 100%); color: white;">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center me-4" style="width: 90px; height: 90px; color: var(--reddora-dark);">
-                    <i class="fas fa-user fa-3x"></i>
+            <div class="card-body p-4 d-flex align-items-center position-relative">
+                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center me-4 shadow-sm" style="width: 100px; height: 100px; color: var(--reddora-dark); overflow: hidden; border: 3px solid white; flex-shrink: 0;">
+                    <?php if (!empty($profile_user['profile_pic'])): ?>
+                        <img src="uploads/profiles/<?= htmlspecialchars($profile_user['profile_pic']) ?>" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
+                    <?php else: ?>
+                        <i class="fas fa-user fa-3x"></i>
+                    <?php endif; ?>
                 </div>
+
                 <div>
                     <h2 class="mb-1 fw-bold"><?= htmlspecialchars($profile_user['username']) ?></h2>
                     <p class="mb-0 opacity-75">
                         <i class="far fa-calendar-alt me-1"></i> Membro desde <?= date('d/m/Y', strtotime($profile_user['created_at'])) ?>
                     </p>
                 </div>
+
+                <?php if ($current_user_id === $profile_id): ?>
+                <div class="ms-auto">
+                    <button class="btn btn-sm btn-outline-light fw-bold" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="fas fa-camera me-1"></i> Editar Foto
+                    </button>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -343,6 +356,32 @@ function getPostBadge($type) {
             </div>
         </div>
     </div>
+
+    <?php if ($current_user_id === $profile_id): ?>
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="post_action.php" method="POST" enctype="multipart/form-data">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold">Atualizar Foto de Perfil</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="upload_pfp">
+                        <div class="mb-3">
+                            <label for="profile_pic" class="form-label text-muted small">Escolha uma imagem (JPG, PNG, GIF, WEBP)</label>
+                            <input class="form-control" type="file" id="profile_pic" name="profile_pic" accept=".jpg,.jpeg,.png,.gif,.webp" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Salvar Foto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>

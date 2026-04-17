@@ -19,6 +19,7 @@ $commands = [
         username TEXT UNIQUE,
         password TEXT,
         bio TEXT,
+        profile_pic TEXT DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )",
     "CREATE TABLE sigs (
