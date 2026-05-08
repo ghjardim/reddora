@@ -299,7 +299,7 @@ function getPostBadge($type) {
                                     <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:0.65rem;font-weight:bold;"><?= strtoupper(substr($ap['username'],0,1)) ?></div>
                                 <?php endif; ?>
                                 <span class="small fw-bold">u/<?= htmlspecialchars($ap['username']) ?></span>
-                                <span class="text-muted small ms-auto"><?= date('d/m', strtotime($ap['created_at'])) ?></span>
+                                <span class="text-muted small ms-auto"><?= date('d/m/Y', strtotime($ap['created_at'])) ?></span>
                             </div>
                             <button class="btn btn-outline-primary btn-sm w-100 py-0" style="font-size:0.75rem;"
                                     data-bs-toggle="modal" data-bs-target="#reviewModal<?= $ap['id'] ?>">

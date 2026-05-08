@@ -210,7 +210,7 @@ function getPostBadge($type) {
                                         <div class="nested-reply-card rounded mb-2">
                                             <div class="reply-meta d-flex justify-content-between">
                                                 <span><i class="fas fa-reply me-1"></i> Réplica em: <a href="question.php?id=<?= $ans['question_id'] ?>" class="text-muted fw-bold text-decoration-none"><?= htmlspecialchars($ans['question_title']) ?></a></span>
-                                                <span><?= date('d/m', strtotime($ans['created_at'])) ?></span>
+                                                <span><?= date('d/m/Y', strtotime($ans['created_at'])) ?></span>
                                             </div>
                                             <div class="markdown-content text-secondary small fst-italic">
                                                 <?= htmlspecialchars(mb_substr($full_body, 0, 100)) . (strlen($full_body)>100?'...':'') ?>
