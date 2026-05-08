@@ -52,21 +52,7 @@ $feed_items = $stmt->fetchAll();
 </head>
 <body class="bg-light">
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="index.php">Reddora</a>
-            <form action="search.php" method="GET" class="mx-auto d-none d-md-flex" style="max-width: 400px; width: 100%;">
-                <div class="input-group input-group-sm">
-                    <input type="text" name="q" class="form-control border-0" placeholder="Pesquisar..." required>
-                    <button class="btn btn-light text-primary fw-bold px-3" type="submit"><i class="fas fa-search"></i></button>
-                </div>
-            </form>
-            <div class="d-flex align-items-center">
-                <a href="profile.php?id=<?= $_SESSION['user_id'] ?>" class="text-white text-decoration-none me-3"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?></a>
-                <form action="post_action.php" method="POST" class="d-inline"><input type="hidden" name="action" value="logout"><button class="btn btn-sm btn-outline-light opacity-75">Sair</button></form>
-            </div>
-        </div>
-    </nav>
+    <?php require 'nav.php'; ?>
 
     <div class="container">
         <div class="row">

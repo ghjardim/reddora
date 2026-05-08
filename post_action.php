@@ -303,6 +303,8 @@ elseif ($action === 'upload_pfp') {
                 // Atualiza a base de dados com o novo nome
                 $stmt = $pdo->prepare("UPDATE users SET profile_pic = ? WHERE id = ?");
                 $stmt->execute([$newFileName, $user_id]);
+                // Atualiza a sessão para a navbar refletir imediatamente
+                $_SESSION['profile_pic'] = $newFileName;
             }
         }
     }
@@ -318,6 +320,7 @@ elseif ($action === 'login') {
     if ($user && password_verify($_POST['password'], $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
+        $_SESSION['profile_pic'] = $user['profile_pic'];
         header("Location: index.php");
     } else { header("Location: login.php?error=1"); }
 
