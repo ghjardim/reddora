@@ -3,7 +3,7 @@
 require 'db.php';
 
 // === 1. LIMPEZA TOTAL ===
-$tables = ['answer_agreements', 'answer_votes', 'answers_fts', 'answers', 'question_agreements', 'question_votes', 'questions_fts', 'questions', 'sig_memberships', 'sigs', 'users'];
+$tables = ['sig_applications', 'sig_application_forms', 'answer_agreements', 'answer_votes', 'answers_fts', 'answers', 'question_agreements', 'question_votes', 'questions_fts', 'questions', 'sig_memberships', 'sigs', 'users'];
 foreach ($tables as $table) {
     $pdo->exec("DROP TABLE IF EXISTS $table");
 }
@@ -27,6 +27,23 @@ $commands = [
         name TEXT,
         description TEXT,
         icon TEXT DEFAULT 'default_sig.png'
+    )",
+    "CREATE TABLE sig_application_forms (
+        sig_id INTEGER PRIMARY KEY,
+        requires_application INTEGER DEFAULT 0,
+        questions_json TEXT DEFAULT '[]'
+    )",
+    "CREATE TABLE sig_applications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sig_id INTEGER,
+        user_id INTEGER,
+        answers_json TEXT,
+        status TEXT DEFAULT 'pending',
+        mod_note TEXT DEFAULT NULL,
+        reviewed_by INTEGER DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at DATETIME DEFAULT NULL,
+        UNIQUE(sig_id, user_id)
     )",
     "CREATE TABLE sig_memberships (
         user_id INTEGER,
@@ -179,6 +196,18 @@ $s_random  = createSig($pdo, 'Papos Aleatórios', 'Conversas sem rumo, memes e h
 $s_genz    = createSig($pdo, 'Gen Z', 'Cringe é quem fala cringe. Discussões geracionais.', 'sig_genz.png');
 
 echo "<h3>4. Sigs criados.</h3>";
+
+// Formulários de candidatura — Gen Z exige aplicação como exemplo
+$pdo->prepare("INSERT INTO sig_application_forms (sig_id, requires_application, questions_json) VALUES (?, 0, '[]')")->execute([$s_ds]);
+$pdo->prepare("INSERT INTO sig_application_forms (sig_id, requires_application, questions_json) VALUES (?, 0, '[]')")->execute([$s_psi]);
+$pdo->prepare("INSERT INTO sig_application_forms (sig_id, requires_application, questions_json) VALUES (?, 0, '[]')")->execute([$s_neuro]);
+$pdo->prepare("INSERT INTO sig_application_forms (sig_id, requires_application, questions_json) VALUES (?, 0, '[]')")->execute([$s_random]);
+$genz_questions = json_encode([
+    ['label' => 'Qual é o seu ano de nascimento?', 'type' => 'text', 'required' => true],
+    ['label' => 'Como você ficou sabendo do Mensa Brasil?', 'type' => 'textarea', 'required' => true],
+    ['label' => 'O que você espera encontrar no SIG Gen Z?', 'type' => 'textarea', 'required' => true],
+]);
+$pdo->prepare("INSERT INTO sig_application_forms (sig_id, requires_application, questions_json) VALUES (?, 1, ?)")->execute([$s_genz, $genz_questions]);
 
 for($i=1; $i<=5; $i++) makeMod($pdo, $u_admin, $i); // admin é mod de todos
 joinSig($pdo, $u_sofia, $s_ds); joinSig($pdo, $u_sofia, $s_random);

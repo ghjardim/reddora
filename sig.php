@@ -25,6 +25,35 @@ if ($user_id) {
     }
 }
 
+// Busca configuração do formulário de aplicação
+$stmt = $pdo->prepare("SELECT * FROM sig_application_forms WHERE sig_id = ?");
+$stmt->execute([$sig_id]);
+$app_form = $stmt->fetch();
+$requires_application = $app_form && $app_form['requires_application'];
+$form_questions = ($app_form && $app_form['questions_json']) ? json_decode($app_form['questions_json'], true) : [];
+
+// Verifica se o usuário já tem candidatura pendente/rejeitada
+$my_application = null;
+if ($user_id && !$is_member) {
+    $stmt = $pdo->prepare("SELECT * FROM sig_applications WHERE sig_id = ? AND user_id = ?");
+    $stmt->execute([$sig_id, $user_id]);
+    $my_application = $stmt->fetch();
+}
+
+// Busca aplicações pendentes (para mods)
+$pending_applications = [];
+if ($is_mod) {
+    $stmt = $pdo->prepare("
+        SELECT a.*, u.username, u.real_name, u.profile_pic
+        FROM sig_applications a
+        JOIN users u ON u.id = a.user_id
+        WHERE a.sig_id = ? AND a.status = 'pending'
+        ORDER BY a.created_at ASC
+    ");
+    $stmt->execute([$sig_id]);
+    $pending_applications = $stmt->fetchAll();
+}
+
 // Busca lista de moderadores do SIG
 $stmt = $pdo->prepare("
     SELECT u.id, u.username, u.real_name, u.profile_pic
@@ -103,17 +132,37 @@ function getPostBadge($type) {
 
                     <?php if ($user_id): ?>
                     <div>
-                        <form action="post_action.php" method="POST">
-                            <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
-                            <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
-                            <?php if ($is_member): ?>
+                        <?php if ($is_member): ?>
+                            <form action="post_action.php" method="POST">
+                                <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                                <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
                                 <input type="hidden" name="action" value="leave_sig">
                                 <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold">Sair</button>
+                            </form>
+                        <?php elseif ($requires_application): ?>
+                            <?php if ($my_application && $my_application['status'] === 'pending'): ?>
+                                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">
+                                    <i class="fas fa-clock me-1"></i> Candidatura em análise
+                                </span>
+                            <?php elseif ($my_application && $my_application['status'] === 'rejected'): ?>
+                                <button class="btn btn-outline-secondary btn-sm rounded-pill px-4 fw-bold"
+                                        data-bs-toggle="modal" data-bs-target="#applyModal">
+                                    <i class="fas fa-redo me-1"></i> Candidatar-se novamente
+                                </button>
                             <?php else: ?>
+                                <button class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm"
+                                        data-bs-toggle="modal" data-bs-target="#applyModal">
+                                    <i class="fas fa-paper-plane me-1"></i> Candidatar-se
+                                </button>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <form action="post_action.php" method="POST">
+                                <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                                <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
                                 <input type="hidden" name="action" value="join_sig">
                                 <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm">Participar</button>
-                            <?php endif; ?>
-                        </form>
+                            </form>
+                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -176,13 +225,52 @@ function getPostBadge($type) {
                     </div>
                 </div>
 
+                <?php if ($is_mod && count($pending_applications) > 0): ?>
+                <div class="card shadow-sm border-0 mb-4 border-warning border-2">
+                    <div class="card-header bg-warning bg-opacity-10 fw-bold small text-uppercase d-flex justify-content-between align-items-center">
+                        <span class="text-warning-emphasis"><i class="fas fa-inbox me-1"></i> Candidaturas Pendentes</span>
+                        <span class="badge bg-warning text-dark"><?= count($pending_applications) ?></span>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php foreach($pending_applications as $ap): ?>
+                        <div class="border-bottom px-3 py-2">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <?php if ($ap['profile_pic']): ?>
+                                    <img src="uploads/profiles/<?= htmlspecialchars($ap['profile_pic']) ?>" class="rounded-circle" style="width:24px;height:24px;object-fit:cover;">
+                                <?php else: ?>
+                                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:0.65rem;color:white;font-weight:bold;"><?= strtoupper(substr($ap['username'],0,1)) ?></div>
+                                <?php endif; ?>
+                                <span class="small fw-bold">u/<?= htmlspecialchars($ap['username']) ?></span>
+                                <span class="text-muted small ms-auto"><?= date('d/m', strtotime($ap['created_at'])) ?></span>
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm w-100 py-0" style="font-size:0.75rem;"
+                                    data-bs-toggle="modal" data-bs-target="#reviewModal<?= $ap['id'] ?>">
+                                <i class="fas fa-eye me-1"></i> Revisar
+                            </button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-white fw-bold small text-muted text-uppercase d-flex justify-content-between align-items-center">
                         <span><i class="fas fa-shield-alt me-1 text-danger"></i> Moderadores</span>
                         <?php if ($is_mod): ?>
-                            <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" data-bs-toggle="modal" data-bs-target="#modManageModal">
-                                <i class="fas fa-cog"></i> Gerir
-                            </button>
+                            <div class="d-flex gap-1">
+                                <?php if ($requires_application): ?>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" data-bs-toggle="modal" data-bs-target="#formBuilderModal">
+                                    <i class="fas fa-clipboard-list"></i> Formulário
+                                </button>
+                                <?php else: ?>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" data-bs-toggle="modal" data-bs-target="#formBuilderModal">
+                                    <i class="fas fa-clipboard-list"></i> Formulário
+                                </button>
+                                <?php endif; ?>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" data-bs-toggle="modal" data-bs-target="#modManageModal">
+                                    <i class="fas fa-cog"></i> Gerir
+                                </button>
+                            </div>
                         <?php endif; ?>
                     </div>
                     <div class="card-body p-0">
@@ -312,6 +400,228 @@ function getPostBadge($type) {
         </div>
     </div>
     <?php endif; ?>
+
+    <?php if ($user_id && !$is_member && $requires_application): ?>
+    <!-- Modal: Formulário de Candidatura -->
+    <div class="modal fade" id="applyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <form action="post_action.php" method="POST">
+                    <input type="hidden" name="action" value="apply_sig">
+                    <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                    <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                    <div class="modal-header border-0">
+                        <div>
+                            <h5 class="modal-title fw-bold">Candidatura para s/<?= htmlspecialchars($sig['name']) ?></h5>
+                            <p class="text-muted small mb-0">Responda às perguntas abaixo. Os moderadores irão avaliar sua candidatura.</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body pt-0">
+                        <?php if ($my_application && $my_application['status'] === 'rejected' && $my_application['mod_note']): ?>
+                        <div class="alert alert-danger small py-2 mb-3">
+                            <i class="fas fa-times-circle me-1"></i> <strong>Candidatura anterior rejeitada:</strong>
+                            <?= htmlspecialchars($my_application['mod_note']) ?>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (empty($form_questions)): ?>
+                            <p class="text-muted small">Este SIG não possui perguntas específicas. Sua candidatura será enviada sem respostas adicionais.</p>
+                        <?php else: ?>
+                            <?php foreach($form_questions as $i => $fq): ?>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small"><?= htmlspecialchars($fq['label']) ?><?= $fq['required'] ? ' <span class="text-danger">*</span>' : '' ?></label>
+                                <?php if ($fq['type'] === 'textarea'): ?>
+                                    <textarea name="answers[<?= $i ?>]" class="form-control form-control-sm" rows="3" <?= $fq['required'] ? 'required' : '' ?>></textarea>
+                                <?php else: ?>
+                                    <input type="text" name="answers[<?= $i ?>]" class="form-control form-control-sm" <?= $fq['required'] ? 'required' : '' ?>>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+                            <i class="fas fa-paper-plane me-1"></i> Enviar Candidatura
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($is_mod): ?>
+    <!-- Modais de revisão de cada candidatura -->
+    <?php foreach($pending_applications as $ap): ?>
+    <div class="modal fade" id="reviewModal<?= $ap['id'] ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-1">
+                    <div>
+                        <h5 class="modal-title fw-bold">Candidatura de u/<?= htmlspecialchars($ap['username']) ?></h5>
+                        <small class="text-muted">Enviada em <?= date('d/m/Y H:i', strtotime($ap['created_at'])) ?></small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <?php
+                    $ap_answers = json_decode($ap['answers_json'], true) ?? [];
+                    if (empty($form_questions) || empty($ap_answers)): ?>
+                        <p class="text-muted small fst-italic">Candidatura sem respostas adicionais.</p>
+                    <?php else: ?>
+                        <?php foreach($form_questions as $i => $fq): ?>
+                        <div class="mb-3">
+                            <p class="small fw-bold mb-1 text-muted text-uppercase" style="font-size:0.7rem;"><?= htmlspecialchars($fq['label']) ?></p>
+                            <p class="small mb-0"><?= htmlspecialchars($ap_answers[$i] ?? '—') ?></p>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <hr>
+                    <p class="small fw-bold text-muted text-uppercase mb-1">Nota para o candidato (opcional)</p>
+                    <form id="reviewForm<?= $ap['id'] ?>Approve" action="post_action.php" method="POST">
+                        <input type="hidden" name="action" value="review_application">
+                        <input type="hidden" name="application_id" value="<?= $ap['id'] ?>">
+                        <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                        <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                        <input type="hidden" name="decision" value="approved">
+                        <textarea name="mod_note" form="reviewForm<?= $ap['id'] ?>Approve" class="form-control form-control-sm mb-3" rows="2" placeholder="Mensagem opcional ao candidato..."></textarea>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-sm flex-fill fw-bold">
+                                <i class="fas fa-check me-1"></i> Aprovar
+                            </button>
+                        </div>
+                    </form>
+                    <form action="post_action.php" method="POST" class="mt-2">
+                        <input type="hidden" name="action" value="review_application">
+                        <input type="hidden" name="application_id" value="<?= $ap['id'] ?>">
+                        <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                        <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                        <input type="hidden" name="decision" value="rejected">
+                        <textarea name="mod_note" class="form-control form-control-sm mb-2" rows="2" placeholder="Explique o motivo da rejeição (recomendado)..."></textarea>
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                            <i class="fas fa-times me-1"></i> Rejeitar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
+    <!-- Modal: Construtor de Formulário -->
+    <div class="modal fade" id="formBuilderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0">
+                    <div>
+                        <h5 class="modal-title fw-bold"><i class="fas fa-clipboard-list text-primary me-2"></i>Formulário de Candidatura</h5>
+                        <p class="small text-muted mb-0">Configure as perguntas que os candidatos devem responder.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="formBuilderBody">
+                    <form action="post_action.php" method="POST" id="formBuilderForm">
+                        <input type="hidden" name="action" value="save_application_form">
+                        <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                        <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                        <input type="hidden" name="questions_json" id="questionsJsonInput" value="">
+
+                        <div class="form-check form-switch mb-4">
+                            <input class="form-check-input" type="checkbox" id="requiresAppToggle"
+                                   name="requires_application" value="1"
+                                   <?= $requires_application ? 'checked' : '' ?>>
+                            <label class="form-check-label fw-semibold" for="requiresAppToggle">
+                                Exigir candidatura para entrar neste SIG
+                            </label>
+                        </div>
+
+                        <div id="questionsContainer">
+                            <!-- Perguntas renderizadas via JS -->
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="addQuestionBtn">
+                            <i class="fas fa-plus me-1"></i> Adicionar Pergunta
+                        </button>
+
+                        <hr>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold" id="saveFormBtn">
+                                <i class="fas fa-save me-1"></i> Salvar Formulário
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <script>
+    // ── Form Builder ──────────────────────────────────────────────────────────
+    const initialQuestions = <?= json_encode($form_questions) ?>;
+    let questions = JSON.parse(JSON.stringify(initialQuestions));
+
+    function renderQuestions() {
+        const container = document.getElementById('questionsContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        if (questions.length === 0) {
+            container.innerHTML = '<p class="text-muted small fst-italic mb-3">Nenhuma pergunta adicionada ainda.</p>';
+            return;
+        }
+        questions.forEach((q, i) => {
+            const div = document.createElement('div');
+            div.className = 'card border-0 bg-light mb-2';
+            div.innerHTML = `
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                        <span class="badge bg-secondary mt-1">${i + 1}</span>
+                        <input type="text" class="form-control form-control-sm" placeholder="Texto da pergunta"
+                               value="${q.label.replace(/"/g, '&quot;')}"
+                               oninput="questions[${i}].label = this.value">
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 ms-auto"
+                                onclick="removeQuestion(${i})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 ms-4">
+                        <select class="form-select form-select-sm" style="width:auto;"
+                                onchange="questions[${i}].type = this.value">
+                            <option value="text" ${q.type === 'text' ? 'selected' : ''}>Resposta curta</option>
+                            <option value="textarea" ${q.type === 'textarea' ? 'selected' : ''}>Resposta longa</option>
+                        </select>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="req_${i}"
+                                   ${q.required ? 'checked' : ''}
+                                   onchange="questions[${i}].required = this.checked">
+                            <label class="form-check-label small" for="req_${i}">Obrigatória</label>
+                        </div>
+                    </div>
+                </div>`;
+            container.appendChild(div);
+        });
+    }
+
+    function removeQuestion(i) {
+        questions.splice(i, 1);
+        renderQuestions();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderQuestions();
+
+        document.getElementById('addQuestionBtn')?.addEventListener('click', () => {
+            questions.push({ label: '', type: 'textarea', required: true });
+            renderQuestions();
+        });
+
+        document.getElementById('formBuilderForm')?.addEventListener('submit', (e) => {
+            document.getElementById('questionsJsonInput').value = JSON.stringify(questions);
+        });
+    });
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -352,9 +352,123 @@ elseif ($action === 'login') {
 
 } elseif ($action === 'join_sig' || $action === 'leave_sig') {
     if (!isset($_SESSION['user_id'])) die("403");
-    $sql = ($action === 'join_sig') ? "INSERT OR IGNORE INTO sig_memberships (user_id, sig_id) VALUES (?, ?)" : "DELETE FROM sig_memberships WHERE user_id = ? AND sig_id = ?";
-    $pdo->prepare($sql)->execute([$_SESSION['user_id'], $_POST['sig_id']]);
+    $sig_id = (int)$_POST['sig_id'];
+    if ($action === 'join_sig') {
+        // Verifica se SIG exige candidatura antes de entrar
+        $chk = $pdo->prepare("SELECT requires_application FROM sig_application_forms WHERE sig_id = ?");
+        $chk->execute([$sig_id]);
+        $form = $chk->fetch();
+        if ($form && $form['requires_application']) {
+            // Bloqueia entrada direta — redireciona para a página do SIG
+            header("Location: sig.php?id=$sig_id");
+            exit;
+        }
+        $pdo->prepare("INSERT OR IGNORE INTO sig_memberships (user_id, sig_id) VALUES (?, ?)")
+            ->execute([$_SESSION['user_id'], $sig_id]);
+    } else {
+        $pdo->prepare("DELETE FROM sig_memberships WHERE user_id = ? AND sig_id = ?")
+            ->execute([$_SESSION['user_id'], $sig_id]);
+    }
     header("Location: " . ($_POST['redirect'] ?? "sigs.php"));
+
+} elseif ($action === 'apply_sig') {
+    if (!isset($_SESSION['user_id'])) die("403");
+    $sig_id = (int)$_POST['sig_id'];
+    $user_id = $_SESSION['user_id'];
+
+    // Verifica se SIG exige candidatura
+    $chk = $pdo->prepare("SELECT requires_application, questions_json FROM sig_application_forms WHERE sig_id = ?");
+    $chk->execute([$sig_id]);
+    $form = $chk->fetch();
+    if (!$form || !$form['requires_application']) {
+        // SIG aberto — entra direto
+        $pdo->prepare("INSERT OR IGNORE INTO sig_memberships (user_id, sig_id) VALUES (?, ?)")
+            ->execute([$user_id, $sig_id]);
+        header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
+        exit;
+    }
+
+    $form_questions = json_decode($form['questions_json'], true) ?? [];
+    $raw_answers = $_POST['answers'] ?? [];
+    // Monta array de respostas indexado igual às perguntas
+    $answers = [];
+    foreach ($form_questions as $i => $q) {
+        $answers[$i] = trim($raw_answers[$i] ?? '');
+    }
+
+    // Upsert (nova candidatura ou reenvio após rejeição)
+    $stmt = $pdo->prepare("
+        INSERT INTO sig_applications (sig_id, user_id, answers_json, status, mod_note, reviewed_by, reviewed_at)
+        VALUES (?, ?, ?, 'pending', NULL, NULL, NULL)
+        ON CONFLICT(sig_id, user_id) DO UPDATE SET
+            answers_json = excluded.answers_json,
+            status = 'pending',
+            mod_note = NULL,
+            reviewed_by = NULL,
+            reviewed_at = NULL,
+            created_at = CURRENT_TIMESTAMP
+    ");
+    $stmt->execute([$sig_id, $user_id, json_encode($answers)]);
+    header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
+
+} elseif ($action === 'review_application') {
+    if (!isset($_SESSION['user_id'])) die("403");
+    $app_id  = (int)$_POST['application_id'];
+    $sig_id  = (int)$_POST['sig_id'];
+    $decision = $_POST['decision'] === 'approved' ? 'approved' : 'rejected';
+    $mod_note = trim($_POST['mod_note'] ?? '');
+
+    // Verifica que executor é mod do SIG
+    $chk = $pdo->prepare("SELECT role FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
+    $chk->execute([$_SESSION['user_id'], $sig_id]);
+    $row = $chk->fetch();
+    if (!($row && $row['role'] === 'mod')) die("403");
+
+    // Busca candidatura
+    $stmt = $pdo->prepare("SELECT * FROM sig_applications WHERE id = ? AND sig_id = ?");
+    $stmt->execute([$app_id, $sig_id]);
+    $app = $stmt->fetch();
+    if (!$app) die("Candidatura não encontrada.");
+
+    // Atualiza status
+    $pdo->prepare("
+        UPDATE sig_applications
+        SET status = ?, mod_note = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ")->execute([$decision, $mod_note ?: null, $_SESSION['user_id'], $app_id]);
+
+    // Se aprovado, adiciona como membro
+    if ($decision === 'approved') {
+        $pdo->prepare("INSERT OR IGNORE INTO sig_memberships (user_id, sig_id) VALUES (?, ?)")
+            ->execute([$app['user_id'], $sig_id]);
+    }
+    header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
+
+} elseif ($action === 'save_application_form') {
+    if (!isset($_SESSION['user_id'])) die("403");
+    $sig_id = (int)$_POST['sig_id'];
+
+    // Verifica que executor é mod
+    $chk = $pdo->prepare("SELECT role FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
+    $chk->execute([$_SESSION['user_id'], $sig_id]);
+    $row = $chk->fetch();
+    if (!($row && $row['role'] === 'mod')) die("403");
+
+    $requires = isset($_POST['requires_application']) ? 1 : 0;
+    $questions_json = $_POST['questions_json'] ?? '[]';
+    // Valida JSON
+    $decoded = json_decode($questions_json, true);
+    if (!is_array($decoded)) $questions_json = '[]';
+
+    $pdo->prepare("
+        INSERT INTO sig_application_forms (sig_id, requires_application, questions_json)
+        VALUES (?, ?, ?)
+        ON CONFLICT(sig_id) DO UPDATE SET
+            requires_application = excluded.requires_application,
+            questions_json = excluded.questions_json
+    ")->execute([$sig_id, $requires, $questions_json]);
+
+    header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
 
 } elseif ($action === 'add_mod' || $action === 'remove_mod') {
     if (!isset($_SESSION['user_id'])) die("403");
