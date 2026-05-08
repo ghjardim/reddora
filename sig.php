@@ -76,6 +76,18 @@ $stmt = $pdo->prepare("
 $stmt->execute([$sig_id]);
 $regular_members = $stmt->fetchAll();
 
+// Busca todos os membros para exibição pública (mods primeiro, depois members)
+$stmt = $pdo->prepare("
+    SELECT u.id, u.username, u.real_name, u.profile_pic, sm.role
+    FROM sig_memberships sm
+    JOIN users u ON u.id = sm.user_id
+    WHERE sm.sig_id = ?
+    ORDER BY sm.role DESC, u.username ASC
+");
+$stmt->execute([$sig_id]);
+$all_members = $stmt->fetchAll();
+$member_count = count($all_members);
+
 // 3. Busca Perguntas deste SIG
 $stmt = $pdo->prepare("
     SELECT q.*, u.username,
@@ -221,7 +233,53 @@ function getPostBadge($type) {
                                 <div class="h5 fw-bold mb-0"><?= count($questions) ?></div>
                                 <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Discussões</small>
                             </div>
+                            <div>
+                                <div class="h5 fw-bold mb-0"><?= $member_count ?></div>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Membros</small>
+                            </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Card: Membros -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white fw-bold small text-muted text-uppercase d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-users me-1"></i> Membros</span>
+                        <button class="btn btn-link btn-sm p-0 text-muted text-decoration-none" style="font-size:0.75rem;"
+                                data-bs-toggle="modal" data-bs-target="#allMembersModal">
+                            Ver todos (<?= $member_count ?>)
+                        </button>
+                    </div>
+                    <div class="card-body pb-2">
+                        <?php if (empty($all_members)): ?>
+                            <p class="text-muted small mb-0">Nenhum membro ainda.</p>
+                        <?php else: ?>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <?php foreach(array_slice($all_members, 0, 12) as $m): ?>
+                                <a href="profile.php?id=<?= $m['id'] ?>"
+                                   title="u/<?= htmlspecialchars($m['username']) ?><?= $m['role'] === 'mod' ? ' (MOD)' : '' ?>"
+                                   class="position-relative text-decoration-none d-inline-block">
+                                    <?php if ($m['profile_pic']): ?>
+                                        <img src="uploads/profiles/<?= htmlspecialchars($m['profile_pic']) ?>"
+                                             class="rounded-circle border <?= $m['role'] === 'mod' ? 'border-danger border-2' : 'border-white' ?>"
+                                             style="width:36px;height:36px;object-fit:cover;">
+                                    <?php else: ?>
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center border <?= $m['role'] === 'mod' ? 'border-danger border-2 bg-danger bg-opacity-10 text-danger' : 'border-light bg-secondary text-white' ?>"
+                                             style="width:36px;height:36px;font-size:0.8rem;font-weight:700;">
+                                            <?= strtoupper(substr($m['username'], 0, 1)) ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </a>
+                                <?php endforeach; ?>
+                                <?php if ($member_count > 12): ?>
+                                <button class="rounded-circle border border-light bg-light d-flex align-items-center justify-content-center text-muted fw-bold"
+                                        style="width:36px;height:36px;font-size:0.7rem;cursor:pointer;"
+                                        data-bs-toggle="modal" data-bs-target="#allMembersModal">
+                                    +<?= $member_count - 12 ?>
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -557,6 +615,83 @@ function getPostBadge($type) {
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- Modal: Lista completa de membros -->
+    <div class="modal fade" id="allMembersModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-1">
+                    <div>
+                        <h5 class="modal-title fw-bold"><i class="fas fa-users me-2 text-primary"></i>Membros de s/<?= htmlspecialchars($sig['name']) ?></h5>
+                        <small class="text-muted"><?= $member_count ?> <?= $member_count === 1 ? 'membro' : 'membros' ?></small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <?php
+                    $mods_list    = array_filter($all_members, fn($m) => $m['role'] === 'mod');
+                    $members_list = array_filter($all_members, fn($m) => $m['role'] !== 'mod');
+                    ?>
+                    <?php if (!empty($mods_list)): ?>
+                    <p class="small fw-bold text-muted text-uppercase mb-2" style="font-size:0.7rem;">
+                        <i class="fas fa-shield-alt text-danger me-1"></i> Moderadores
+                    </p>
+                    <?php foreach($mods_list as $m): ?>
+                    <a href="profile.php?id=<?= $m['id'] ?>" class="d-flex align-items-center gap-3 text-decoration-none text-dark py-2 border-bottom">
+                        <?php if ($m['profile_pic']): ?>
+                            <img src="uploads/profiles/<?= htmlspecialchars($m['profile_pic']) ?>"
+                                 class="rounded-circle border border-danger border-2"
+                                 style="width:40px;height:40px;object-fit:cover;flex-shrink:0;">
+                        <?php else: ?>
+                            <div class="rounded-circle bg-danger bg-opacity-10 border border-danger border-2 d-flex align-items-center justify-content-center text-danger fw-bold"
+                                 style="width:40px;height:40px;flex-shrink:0;">
+                                <?= strtoupper(substr($m['username'], 0, 1)) ?>
+                            </div>
+                        <?php endif; ?>
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="fw-semibold small lh-1 mb-1">
+                                u/<?= htmlspecialchars($m['username']) ?>
+                                <span class="badge bg-danger ms-1" style="font-size:0.55rem;">MOD</span>
+                            </div>
+                            <?php if ($m['real_name']): ?>
+                            <div class="text-muted" style="font-size:0.75rem;"><?= htmlspecialchars($m['real_name']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                        <i class="fas fa-chevron-right text-muted opacity-50" style="font-size:0.7rem;"></i>
+                    </a>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <?php if (!empty($members_list)): ?>
+                    <p class="small fw-bold text-muted text-uppercase mb-2 mt-3" style="font-size:0.7rem;">
+                        <i class="fas fa-user me-1"></i> Membros
+                    </p>
+                    <?php foreach($members_list as $m): ?>
+                    <a href="profile.php?id=<?= $m['id'] ?>" class="d-flex align-items-center gap-3 text-decoration-none text-dark py-2 border-bottom">
+                        <?php if ($m['profile_pic']): ?>
+                            <img src="uploads/profiles/<?= htmlspecialchars($m['profile_pic']) ?>"
+                                 class="rounded-circle border border-light"
+                                 style="width:40px;height:40px;object-fit:cover;flex-shrink:0;">
+                        <?php else: ?>
+                            <div class="rounded-circle bg-secondary bg-opacity-15 border border-light d-flex align-items-center justify-content-center text-secondary fw-bold"
+                                 style="width:40px;height:40px;flex-shrink:0;">
+                                <?= strtoupper(substr($m['username'], 0, 1)) ?>
+                            </div>
+                        <?php endif; ?>
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="fw-semibold small lh-1 mb-1">u/<?= htmlspecialchars($m['username']) ?></div>
+                            <?php if ($m['real_name']): ?>
+                            <div class="text-muted" style="font-size:0.75rem;"><?= htmlspecialchars($m['real_name']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                        <i class="fas fa-chevron-right text-muted opacity-50" style="font-size:0.7rem;"></i>
+                    </a>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
     // ── Form Builder ──────────────────────────────────────────────────────────
