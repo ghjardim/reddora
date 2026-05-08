@@ -75,7 +75,8 @@ $feed_items = $stmt->fetchAll();
                     <div class="card-header bg-white fw-bold text-uppercase small text-muted">Seus Sigs</div>
                     <div class="list-group list-group-flush">
                         <?php foreach($my_sigs as $sig): ?>
-                            <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0">
+                            <a href="sig.php?id=<?= $sig['id'] ?>" class="list-group-item list-group-item-action d-flex align-items-center border-0">
+                                <img src="uploads/sigs/<?= htmlspecialchars($sig['icon'] ?? 'default_sig.png') ?>" alt="<?= htmlspecialchars($sig['name']) ?>" class="me-2 rounded" style="width: 24px; height: 24px; object-fit: cover; background-color: #e9ecef;">
                                 <span class="fw-bold" style="color: var(--reddora-dark)"><?= htmlspecialchars($sig['name']) ?></span>
                             </a>
                         <?php endforeach; ?>

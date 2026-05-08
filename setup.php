@@ -25,7 +25,8 @@ $commands = [
     "CREATE TABLE sigs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        description TEXT
+        description TEXT,
+        icon TEXT DEFAULT 'default_sig.png'
     )",
     "CREATE TABLE sig_memberships (
         user_id INTEGER,
@@ -132,9 +133,9 @@ function createUser($pdo, $username, $real_name, $bio) {
     return $pdo->lastInsertId();
 }
 
-function createSig($pdo, $name, $desc) {
-    $stmt = $pdo->prepare("INSERT INTO sigs (name, description) VALUES (?, ?)");
-    $stmt->execute([$name, $desc]);
+function createSig($pdo, $name, $desc, $icon = 'default_sig.png') {
+    $stmt = $pdo->prepare("INSERT INTO sigs (name, description, icon) VALUES (?, ?, ?)");
+    $stmt->execute([$name, $desc, $icon]);
     return $pdo->lastInsertId();
 }
 
@@ -165,11 +166,11 @@ $u_renato  = createUser($pdo, 'Renato_Ceticismo', 'Renato Silva', 'Engenheiro Ci
 
 echo "<h3>3. Utilizadores criados com Nomes Reais e Bios.</h3>";
 
-$s_ds      = createSig($pdo, 'Data Science', 'Python, R, IA, Estatística e Big Data.');
-$s_psi     = createSig($pdo, 'Psicologia', 'Mente humana, comportamento e terapia.');
-$s_neuro   = createSig($pdo, 'Neurodiversidade', 'TDAH, Autismo e convivência.');
-$s_random  = createSig($pdo, 'Papos Aleatórios', 'Conversas sem rumo, memes e histórias.');
-$s_genz    = createSig($pdo, 'Gen Z', 'Cringe é quem fala cringe. Discussões geracionais.');
+$s_ds      = createSig($pdo, 'Data Science', 'Python, R, IA, Estatística e Big Data.', 'sig_ds.png');
+$s_psi     = createSig($pdo, 'Psicologia', 'Mente humana, comportamento e terapia.', 'sig_psi.png');
+$s_neuro   = createSig($pdo, 'Neurodiversidade', 'TDAH, Autismo e convivência.', 'sig_neuro.png');
+$s_random  = createSig($pdo, 'Papos Aleatórios', 'Conversas sem rumo, memes e histórias.', 'sig_random.png');
+$s_genz    = createSig($pdo, 'Gen Z', 'Cringe é quem fala cringe. Discussões geracionais.', 'sig_genz.png');
 
 echo "<h3>4. Sigs criados.</h3>";
 
