@@ -353,6 +353,28 @@ elseif ($action === 'login') {
     $pdo->prepare($sql)->execute([$_SESSION['user_id'], $_POST['sig_id']]);
     header("Location: " . ($_POST['redirect'] ?? "sigs.php"));
 
+} elseif ($action === 'add_mod' || $action === 'remove_mod') {
+    if (!isset($_SESSION['user_id'])) die("403");
+    $sig_id = (int)$_POST['sig_id'];
+    $target = (int)$_POST['target_user_id'];
+    // Verifica que o executor é mod do SIG
+    $chk = $pdo->prepare("SELECT role FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
+    $chk->execute([$_SESSION['user_id'], $sig_id]);
+    $row = $chk->fetch();
+    if (!($row && $row['role'] === 'mod')) die("403 - Não és moderador deste SIG.");
+    if ($action === 'add_mod') {
+        // Deve ser membro para virar mod
+        $ins = $pdo->prepare("INSERT OR IGNORE INTO sig_memberships (user_id, sig_id, role) VALUES (?, ?, 'mod')");
+        $ins->execute([$target, $sig_id]);
+        $upd = $pdo->prepare("UPDATE sig_memberships SET role = 'mod' WHERE user_id = ? AND sig_id = ?");
+        $upd->execute([$target, $sig_id]);
+    } else {
+        // remove_mod: rebaixa para member (não expulsa)
+        $upd = $pdo->prepare("UPDATE sig_memberships SET role = 'member' WHERE user_id = ? AND sig_id = ?");
+        $upd->execute([$target, $sig_id]);
+    }
+    header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
+
 } elseif ($action === 'update_profile') {
     if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
     $bio = trim($_POST['bio']);

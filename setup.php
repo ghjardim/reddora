@@ -31,6 +31,7 @@ $commands = [
     "CREATE TABLE sig_memberships (
         user_id INTEGER,
         sig_id INTEGER,
+        role TEXT DEFAULT 'member',
         PRIMARY KEY (user_id, sig_id)
     )",
     "CREATE TABLE questions (
@@ -155,6 +156,11 @@ function joinSig($pdo, $uid, $sid) {
     $pdo->exec("INSERT OR IGNORE INTO sig_memberships (user_id, sig_id) VALUES ($uid, $sid)");
 }
 
+function makeMod($pdo, $uid, $sid) {
+    joinSig($pdo, $uid, $sid);
+    $pdo->exec("UPDATE sig_memberships SET role = 'mod' WHERE user_id = $uid AND sig_id = $sid");
+}
+
 // === 4. POPULANDO DADOS ===
 // Passando o "Nome Real" para cada utilizador
 $u_admin   = createUser($pdo, 'admin', 'Administrador', 'Administrador do Sistema | Mod');
@@ -174,12 +180,18 @@ $s_genz    = createSig($pdo, 'Gen Z', 'Cringe é quem fala cringe. Discussões g
 
 echo "<h3>4. Sigs criados.</h3>";
 
-for($i=1; $i<=5; $i++) joinSig($pdo, $u_admin, $i);
+for($i=1; $i<=5; $i++) makeMod($pdo, $u_admin, $i); // admin é mod de todos
 joinSig($pdo, $u_sofia, $s_ds); joinSig($pdo, $u_sofia, $s_random);
 joinSig($pdo, $u_julia, $s_psi); joinSig($pdo, $u_julia, $s_neuro);
 joinSig($pdo, $u_dani, $s_neuro); joinSig($pdo, $u_dani, $s_psi); joinSig($pdo, $u_dani, $s_random);
 joinSig($pdo, $u_felipe, $s_genz); joinSig($pdo, $u_felipe, $s_ds);
 joinSig($pdo, $u_renato, $s_ds); joinSig($pdo, $u_renato, $s_psi); joinSig($pdo, $u_renato, $s_random);
+
+// Mods naturais de cada SIG (além do admin)
+makeMod($pdo, $u_sofia, $s_ds);
+makeMod($pdo, $u_julia, $s_psi);
+makeMod($pdo, $u_dani, $s_neuro);
+makeMod($pdo, $u_felipe, $s_genz);
 
 // === 5. CONTEÚDO DENSO ===
 $body_q1 = "Estou a liderar um projeto de migração de dados numa fintech e a minha equipa técnica está num impasse ideológico.\n\nMetade dos engenheiros quer continuar a usar **Pandas (v2.0 com PyArrow backend)** pela familiaridade e ecossistema. Porém, estamos a lidar com dumps diários de Parquet que já excedem 50GB. A máquina de desenvolvimento padrão tem 32GB de RAM, o que causa *OOM (Out of Memory)* constantemente se não processarmos em chunks.\n\nA outra metade quer migrar tudo para **Polars** ou **PySpark** local. A minha dúvida é sobre o ROI desta refatoração.\n\n> O custo de reescrever a base de código (refatoração de milhares de linhas de ETL) realmente compensa o ganho de performance e redução de infraestrutura?\n\nAlguém tem benchmarks reais de produção comparando o custo de horas/homem da migração versus a economia na AWS?";

@@ -29,6 +29,11 @@ $stmt->execute([$user_id, $user_id, $q_id]);
 $question = $stmt->fetch();
 if (!$question) die("Publicação não encontrada.");
 
+// Busca IDs dos mods do SIG desta pergunta
+$stmt = $pdo->prepare("SELECT user_id FROM sig_memberships WHERE sig_id = ? AND role = 'mod'");
+$stmt->execute([$question['sig_id']]);
+$sig_mod_ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
 // 2. BUSCA INTELIGENTE (BM25 + VOTOS): Mais do Autor Relacionado
 $clean_title = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $question['title']);
 $words = array_filter(explode(' ', trim($clean_title)));
@@ -194,7 +199,7 @@ function count_children($parent_id, $comments_by_parent) {
                         <div class="d-flex align-items-center mb-3">
                             <?= getPostBadge($question['post_type']) ?>
                             <a href="sig.php?id=<?= $question['sig_id'] ?>" class="badge bg-light text-dark border text-decoration-none me-2"><?= htmlspecialchars($question['sig_name']) ?></a>
-                            <span class="text-muted small">u/<?= htmlspecialchars($question['username']) ?> &bull; <?= date('d/m/Y', strtotime($question['created_at'])) ?></span>
+                            <span class="text-muted small">u/<?= htmlspecialchars($question['username']) ?><?php if (in_array($question['user_id'], $sig_mod_ids)): ?> <span class="badge bg-danger" style="font-size:0.6rem;">MOD</span><?php endif; ?> &bull; <?= date('d/m/Y', strtotime($question['created_at'])) ?></span>
                         </div>
                         <h1 class="fw-bold mb-4 text-dark" style="font-size:1.75rem;"><?= htmlspecialchars($question['title']) ?></h1>
                         <div class="markdown-content question-body mb-4"><?= htmlspecialchars($question['body']) ?></div>
@@ -244,7 +249,7 @@ function count_children($parent_id, $comments_by_parent) {
                                     <div class="d-flex align-items-center mb-3">
                                         <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-2" style="width:32px; height:32px; font-weight:bold; color:var(--reddora-dark);"><?= strtoupper(substr($root_ans['username'], 0, 1)) ?></div>
                                         <div>
-                                            <a href="profile.php?id=<?= $root_ans['user_id'] ?>" class="fw-bold text-dark d-block lh-1 text-decoration-none"><?= htmlspecialchars($root_ans['username']) ?></a>
+                                            <a href="profile.php?id=<?= $root_ans['user_id'] ?>" class="fw-bold text-dark d-block lh-1 text-decoration-none"><?= htmlspecialchars($root_ans['username']) ?><?php if (in_array($root_ans['user_id'], $sig_mod_ids)): ?> <span class="badge bg-danger" style="font-size:0.55rem;">MOD</span><?php endif; ?></a>
                                             <small class="text-muted"><?= date('d M', strtotime($root_ans['created_at'])) ?></small>
                                         </div>
                                     </div>

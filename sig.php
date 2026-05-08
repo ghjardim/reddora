@@ -14,11 +14,38 @@ if (!$sig) die("SIG não encontrado.");
 
 // 2. Verifica se Usuário é membro
 $is_member = false;
+$is_mod = false;
 if ($user_id) {
-    $stmt = $pdo->prepare("SELECT 1 FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
+    $stmt = $pdo->prepare("SELECT role FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
     $stmt->execute([$user_id, $sig_id]);
-    $is_member = (bool)$stmt->fetch();
+    $membership = $stmt->fetch();
+    if ($membership) {
+        $is_member = true;
+        $is_mod = ($membership['role'] === 'mod');
+    }
 }
+
+// Busca lista de moderadores do SIG
+$stmt = $pdo->prepare("
+    SELECT u.id, u.username, u.real_name, u.profile_pic
+    FROM sig_memberships sm
+    JOIN users u ON u.id = sm.user_id
+    WHERE sm.sig_id = ? AND sm.role = 'mod'
+    ORDER BY u.username
+");
+$stmt->execute([$sig_id]);
+$mods = $stmt->fetchAll();
+
+// Busca membros que não são mods (para painel de gestão)
+$stmt = $pdo->prepare("
+    SELECT u.id, u.username, u.real_name
+    FROM sig_memberships sm
+    JOIN users u ON u.id = sm.user_id
+    WHERE sm.sig_id = ? AND sm.role = 'member'
+    ORDER BY u.username
+");
+$stmt->execute([$sig_id]);
+$regular_members = $stmt->fetchAll();
 
 // 3. Busca Perguntas deste SIG
 $stmt = $pdo->prepare("
@@ -128,7 +155,8 @@ function getPostBadge($type) {
                                         <?= getPostBadge($q['post_type']) ?>
                                         <span class="fw-bold text-dark fs-5"><?= htmlspecialchars($q['title']) ?></span>
                                     </div>
-                                    <small class="text-muted">Postado por <b>u/<?= htmlspecialchars($q['username']) ?></b> &bull; <?= date('d/m/Y H:i', strtotime($q['created_at'])) ?></small>
+                                    <?php $mod_ids = array_column($mods, 'id'); ?>
+                                    <small class="text-muted">Postado por <b>u/<?= htmlspecialchars($q['username']) ?></b><?php if (in_array($q['user_id'], $mod_ids)): ?> <span class="badge bg-danger" style="font-size:0.55rem;">MOD</span><?php endif; ?> &bull; <?= date('d/m/Y H:i', strtotime($q['created_at'])) ?></small>
                                 </div>
                                 <div class="text-end">
                                     <span class="badge bg-light text-dark border rounded-pill px-3 py-2">
@@ -160,6 +188,40 @@ function getPostBadge($type) {
                                 <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Discussões</small>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white fw-bold small text-muted text-uppercase d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-shield-alt me-1 text-danger"></i> Moderadores</span>
+                        <?php if ($is_mod): ?>
+                            <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" data-bs-toggle="modal" data-bs-target="#modManageModal">
+                                <i class="fas fa-cog"></i> Gerir
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php if (empty($mods)): ?>
+                            <p class="text-muted small p-3 mb-0">Nenhum moderador definido.</p>
+                        <?php else: ?>
+                            <ul class="list-group list-group-flush">
+                            <?php foreach($mods as $mod): ?>
+                                <li class="list-group-item d-flex align-items-center gap-2 py-2 px-3">
+                                    <?php if ($mod['profile_pic']): ?>
+                                        <img src="uploads/profiles/<?= htmlspecialchars($mod['profile_pic']) ?>" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;">
+                                    <?php else: ?>
+                                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width:28px;height:28px;">
+                                            <i class="fas fa-user text-white" style="font-size:0.7rem;"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div>
+                                        <a href="profile.php?id=<?= $mod['id'] ?>" class="text-decoration-none fw-bold small text-dark">u/<?= htmlspecialchars($mod['username']) ?></a>
+                                        <span class="badge bg-danger ms-1" style="font-size:0.6rem;">MOD</span>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -206,6 +268,61 @@ function getPostBadge($type) {
                         <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">Publicar Post</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($is_mod): ?>
+    <div class="modal fade" id="modManageModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-shield-alt text-danger me-2"></i>Gerir Moderadores</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <?php if (!empty($mods)): ?>
+                    <p class="small fw-bold text-muted text-uppercase mb-2">Moderadores Atuais</p>
+                    <?php foreach($mods as $m): ?>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="small">u/<?= htmlspecialchars($m['username']) ?> <span class="badge bg-danger" style="font-size:0.6rem;">MOD</span></span>
+                            <?php if ($m['id'] != $user_id): ?>
+                            <form action="post_action.php" method="POST" class="m-0">
+                                <input type="hidden" name="action" value="remove_mod">
+                                <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                                <input type="hidden" name="target_user_id" value="<?= $m['id'] ?>">
+                                <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                                <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size:0.75rem;">Remover</button>
+                            </form>
+                            <?php else: ?>
+                            <span class="text-muted small">(você)</span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <?php if (!empty($regular_members)): ?>
+                    <hr>
+                    <p class="small fw-bold text-muted text-uppercase mb-2">Promover Membro</p>
+                    <form action="post_action.php" method="POST">
+                        <input type="hidden" name="action" value="add_mod">
+                        <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                        <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                        <div class="input-group input-group-sm">
+                            <select name="target_user_id" class="form-select">
+                                <?php foreach($regular_members as $m): ?>
+                                    <option value="<?= $m['id'] ?>">u/<?= htmlspecialchars($m['username']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="submit" class="btn btn-danger">Promover a Mod</button>
+                        </div>
+                    </form>
+                    <?php else: ?>
+                    <hr>
+                    <p class="text-muted small">Todos os membros já são moderadores.</p>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
