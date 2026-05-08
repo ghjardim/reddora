@@ -121,7 +121,7 @@ function getPostBadge($type) {
                     <?php if (!empty($profile_user['profile_pic'])): ?>
                         <img src="uploads/profiles/<?= htmlspecialchars($profile_user['profile_pic']) ?>" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
                     <?php else: ?>
-                        <i class="fas fa-user fa-3x"></i>
+                        <span style="font-size: 2.5rem; font-weight: 700; color: var(--reddora-dark);"><?= strtoupper(substr($profile_user['username'], 0, 1)) ?></span>
                     <?php endif; ?>
                 </div>
 

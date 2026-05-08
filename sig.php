@@ -264,7 +264,7 @@ function getPostBadge($type) {
                                              class="rounded-circle border <?= $m['role'] === 'mod' ? 'border-danger border-2' : 'border-white' ?>"
                                              style="width:36px;height:36px;object-fit:cover;">
                                     <?php else: ?>
-                                        <div class="rounded-circle d-flex align-items-center justify-content-center border <?= $m['role'] === 'mod' ? 'border-danger border-2 bg-danger bg-opacity-10 text-danger' : 'border-light bg-secondary text-white' ?>"
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center border <?= $m['role'] === 'mod' ? 'border-danger border-2 bg-danger bg-opacity-10 text-danger' : 'border-white bg-primary text-white' ?>"
                                              style="width:36px;height:36px;font-size:0.8rem;font-weight:700;">
                                             <?= strtoupper(substr($m['username'], 0, 1)) ?>
                                         </div>
@@ -296,7 +296,7 @@ function getPostBadge($type) {
                                 <?php if ($ap['profile_pic']): ?>
                                     <img src="uploads/profiles/<?= htmlspecialchars($ap['profile_pic']) ?>" class="rounded-circle" style="width:24px;height:24px;object-fit:cover;">
                                 <?php else: ?>
-                                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:0.65rem;color:white;font-weight:bold;"><?= strtoupper(substr($ap['username'],0,1)) ?></div>
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:0.65rem;font-weight:bold;"><?= strtoupper(substr($ap['username'],0,1)) ?></div>
                                 <?php endif; ?>
                                 <span class="small fw-bold">u/<?= htmlspecialchars($ap['username']) ?></span>
                                 <span class="text-muted small ms-auto"><?= date('d/m', strtotime($ap['created_at'])) ?></span>
@@ -341,8 +341,8 @@ function getPostBadge($type) {
                                     <?php if ($mod['profile_pic']): ?>
                                         <img src="uploads/profiles/<?= htmlspecialchars($mod['profile_pic']) ?>" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;">
                                     <?php else: ?>
-                                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width:28px;height:28px;">
-                                            <i class="fas fa-user text-white" style="font-size:0.7rem;"></i>
+                                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:28px;height:28px;font-size:0.75rem;font-weight:bold;">
+                                            <?= strtoupper(substr($mod['username'], 0, 1)) ?>
                                         </div>
                                     <?php endif; ?>
                                     <div>
@@ -673,7 +673,7 @@ function getPostBadge($type) {
                                  class="rounded-circle border border-light"
                                  style="width:40px;height:40px;object-fit:cover;flex-shrink:0;">
                         <?php else: ?>
-                            <div class="rounded-circle bg-secondary bg-opacity-15 border border-light d-flex align-items-center justify-content-center text-secondary fw-bold"
+                            <div class="rounded-circle bg-primary text-white border border-light d-flex align-items-center justify-content-center fw-bold"
                                  style="width:40px;height:40px;flex-shrink:0;">
                                 <?= strtoupper(substr($m['username'], 0, 1)) ?>
                             </div>

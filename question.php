@@ -15,7 +15,7 @@ function getPostBadge($type) {
 
 // 1. Busca a Pergunta Atual (AGORA COM JOIN NAS TABELAS DE VOTOS DA PERGUNTA)
 $stmt = $pdo->prepare("
-    SELECT q.*, s.name as sig_name, u.username,
+    SELECT q.*, s.name as sig_name, u.username, u.profile_pic,
            qv.vote_type as user_vote,
            qa.agreement_type as user_agreement
     FROM questions q
@@ -73,7 +73,7 @@ if (empty($more_from_user)) {
 
 // 3. Busca as Respostas do Post Atual
 $stmt = $pdo->prepare("
-    SELECT a.*, u.username,
+    SELECT a.*, u.username, u.profile_pic,
            v.vote_type as user_vote,
            ag.agreement_type as user_agreement
     FROM answers a
@@ -98,6 +98,11 @@ function render_replies($parent_id, $comments_by_parent, $q_id) {
             ?>
             <div class="mt-3 ps-3 thread-line">
                 <div class="mb-1 d-flex align-items-center">
+                    <?php if (!empty($ans['profile_pic'])): ?>
+                        <img src="uploads/profiles/<?= htmlspecialchars($ans['profile_pic']) ?>" class="rounded-circle me-2" style="width:22px;height:22px;object-fit:cover;">
+                    <?php else: ?>
+                        <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width:22px;height:22px;font-weight:bold;font-size:0.65rem;"><?= strtoupper(substr($ans['username'], 0, 1)) ?></div>
+                    <?php endif; ?>
                     <a href="profile.php?id=<?= $ans['user_id'] ?>" class="fw-bold text-dark text-decoration-none small"><?= htmlspecialchars($ans['username']) ?></a>
                     <span class="text-muted small ms-2" style="font-size:0.75rem;"><?= date('d M', strtotime($ans['created_at'])) ?></span>
                 </div>
@@ -237,7 +242,11 @@ function count_children($parent_id, $comments_by_parent) {
                             <div class="card mb-3 border-0 shadow-sm">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center mb-3">
-                                        <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-2" style="width:32px; height:32px; font-weight:bold; color:var(--reddora-dark);"><?= strtoupper(substr($root_ans['username'], 0, 1)) ?></div>
+                                        <?php if (!empty($root_ans['profile_pic'])): ?>
+                                            <img src="uploads/profiles/<?= htmlspecialchars($root_ans['profile_pic']) ?>" class="rounded-circle me-2" style="width:32px;height:32px;object-fit:cover;">
+                                        <?php else: ?>
+                                            <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width:32px;height:32px;font-weight:bold;font-size:0.85rem;"><?= strtoupper(substr($root_ans['username'], 0, 1)) ?></div>
+                                        <?php endif; ?>
                                         <div>
                                             <a href="profile.php?id=<?= $root_ans['user_id'] ?>" class="fw-bold text-dark d-block lh-1 text-decoration-none"><?= htmlspecialchars($root_ans['username']) ?><?php if (in_array($root_ans['user_id'], $sig_mod_ids)): ?> <span class="badge bg-danger" style="font-size:0.55rem;">MOD</span><?php endif; ?></a>
                                             <small class="text-muted"><?= date('d M', strtotime($root_ans['created_at'])) ?></small>

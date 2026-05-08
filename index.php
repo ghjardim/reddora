@@ -25,7 +25,7 @@ $stmt->execute([$user_id]);
 $recent_posts = $stmt->fetchAll();
 
 // 4. FEED DE DISCUSSÕES
-$stmt = $pdo->prepare("SELECT a.id as answer_id, a.body as answer_body, a.votes as answer_votes, a.created_at as answer_date, u.id as answer_user_id, u.username as answer_username, q.id as question_id, q.title as question_title, q.post_type, qu.username as question_username, qu.id as question_user_id, s.id as sig_id, s.name as sig_name, v.vote_type as user_vote FROM answers a JOIN questions q ON a.question_id = q.id JOIN sigs s ON q.sig_id = s.id JOIN users u ON a.user_id = u.id JOIN users qu ON q.user_id = qu.id JOIN sig_memberships m ON s.id = m.sig_id LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ? WHERE m.user_id = ? AND a.parent_id IS NULL ORDER BY a.created_at DESC LIMIT 50");
+$stmt = $pdo->prepare("SELECT a.id as answer_id, a.body as answer_body, a.votes as answer_votes, a.created_at as answer_date, u.id as answer_user_id, u.username as answer_username, u.profile_pic as answer_profile_pic, q.id as question_id, q.title as question_title, q.post_type, qu.username as question_username, qu.id as question_user_id, s.id as sig_id, s.name as sig_name, v.vote_type as user_vote FROM answers a JOIN questions q ON a.question_id = q.id JOIN sigs s ON q.sig_id = s.id JOIN users u ON a.user_id = u.id JOIN users qu ON q.user_id = qu.id JOIN sig_memberships m ON s.id = m.sig_id LEFT JOIN answer_votes v ON a.id = v.answer_id AND v.user_id = ? WHERE m.user_id = ? AND a.parent_id IS NULL ORDER BY a.created_at DESC LIMIT 50");
 $stmt->execute([$user_id, $user_id]);
 $feed_items = $stmt->fetchAll();
 ?>
@@ -152,7 +152,11 @@ $feed_items = $stmt->fetchAll();
                             </div>
 
                             <div class="d-flex align-items-center mb-2">
-                                <div class="bg-secondary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 24px; height: 24px; font-size: 0.7rem;"><?= strtoupper(substr($item['answer_username'], 0, 1)) ?></div>
+                                <?php if (!empty($item['answer_profile_pic'])): ?>
+                                    <img src="uploads/profiles/<?= htmlspecialchars($item['answer_profile_pic']) ?>" class="rounded-circle me-2" style="width:24px;height:24px;object-fit:cover;">
+                                <?php else: ?>
+                                    <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width:24px;height:24px;font-size:0.7rem;font-weight:bold;"><?= strtoupper(substr($item['answer_username'], 0, 1)) ?></div>
+                                <?php endif; ?>
                                 <span class="fw-bold small">u/<?= htmlspecialchars($item['answer_username']) ?></span>
                             </div>
                             <div class="markdown-content text-dark mb-3"><?= htmlspecialchars($item['answer_body']) ?></div>

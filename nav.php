@@ -55,8 +55,8 @@ $_nav_back     = $nav_back ?? null;
                              class="rounded-circle border border-white border-opacity-50"
                              style="width:30px; height:30px; object-fit:cover;">
                     <?php else: ?>
-                        <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center"
-                             style="width:30px; height:30px; font-size:0.8rem; font-weight:700; flex-shrink:0;">
+                        <div class="rounded-circle bg-primary bg-opacity-75 border border-white border-opacity-50 d-flex align-items-center justify-content-center"
+                             style="width:30px; height:30px; font-size:0.8rem; font-weight:700; flex-shrink:0; color:white;">
                             <?= strtoupper(substr($_nav_username, 0, 1)) ?>
                         </div>
                     <?php endif; ?>
