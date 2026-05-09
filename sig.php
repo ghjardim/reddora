@@ -130,11 +130,20 @@ function getPostBadge($type) {
             <div class="bg-primary" style="height: 100px; background: linear-gradient(45deg, var(--reddora-red), #b92b27);"></div>
             <div class="card-body pt-0 px-4 pb-4">
                 <div class="d-flex align-items-end mb-3" style="margin-top: -40px;">
-                    <div class="bg-white p-1 rounded shadow-sm me-3" style="width: 80px; height: 80px;">
+                    <div class="bg-white p-1 rounded shadow-sm me-3 position-relative" style="width: 80px; height: 80px;">
                         <img src="uploads/sigs/<?= htmlspecialchars($sig['icon'] ?? 'default_sig.png') ?>"
                              alt="<?= htmlspecialchars($sig['name']) ?>"
                              class="rounded"
                              style="width: 100%; height: 100%; object-fit: cover;">
+                        <?php if ($is_mod): ?>
+                        <button type="button"
+                                class="position-absolute bottom-0 end-0 btn btn-dark btn-sm p-0 d-flex align-items-center justify-content-center rounded-circle shadow"
+                                style="width:24px;height:24px;font-size:0.65rem;transform:translate(25%,25%);"
+                                data-bs-toggle="modal" data-bs-target="#changeSigIconModal"
+                                title="Alterar imagem do SIG">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                        <?php endif; ?>
                     </div>
 
                     <div class="flex-grow-1">
@@ -567,6 +576,43 @@ function getPostBadge($type) {
     </div>
     <?php endforeach; ?>
 
+    <!-- Modal: Alterar Imagem do SIG -->
+    <div class="modal fade" id="changeSigIconModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content border-0 shadow">
+                <form action="post_action.php" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="update_sig_icon">
+                    <input type="hidden" name="sig_id" value="<?= $sig_id ?>">
+                    <input type="hidden" name="redirect" value="sig.php?id=<?= $sig_id ?>">
+                    <div class="modal-header border-0 pb-1">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-image text-primary me-2"></i>Imagem do SIG</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center py-3">
+                        <div class="mb-3">
+                            <img src="uploads/sigs/<?= htmlspecialchars($sig['icon'] ?? 'default_sig.png') ?>"
+                                 id="sigIconPreview"
+                                 class="rounded shadow-sm"
+                                 style="width:100px;height:100px;object-fit:cover;">
+                        </div>
+                        <label for="sigIconInput" class="btn btn-outline-primary btn-sm rounded-pill px-4">
+                            <i class="fas fa-upload me-1"></i> Escolher imagem
+                        </label>
+                        <input type="file" id="sigIconInput" name="sig_icon" accept="image/jpeg,image/png,image/gif,image/webp"
+                               class="d-none">
+                        <p class="text-muted mt-2 mb-0" style="font-size:0.75rem;">JPG, PNG, GIF ou WEBP · máx. 2 MB</p>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold" id="saveIconBtn" disabled>
+                            <i class="fas fa-save me-1"></i> Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Construtor de Formulário -->
     <div class="modal fade" id="formBuilderModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -694,7 +740,23 @@ function getPostBadge($type) {
     </div>
 
     <script>
-    // ── Form Builder ──────────────────────────────────────────────────────────
+    // ── SIG Icon Preview ─────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        const sigIconInput = document.getElementById('sigIconInput');
+        if (sigIconInput) {
+            sigIconInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (!file) return;
+                const preview = document.getElementById('sigIconPreview');
+                const saveBtn = document.getElementById('saveIconBtn');
+                preview.src = URL.createObjectURL(file);
+                saveBtn.disabled = false;
+            });
+        }
+
+        // ── Form Builder ─────────────────────────────────────────────────────
+    });
+
     const initialQuestions = <?= json_encode($form_questions) ?>;
     let questions = JSON.parse(JSON.stringify(initialQuestions));
 

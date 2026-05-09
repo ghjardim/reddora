@@ -492,6 +492,48 @@ elseif ($action === 'login') {
     }
     header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
 
+} elseif ($action === 'update_sig_icon') {
+    if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+
+    $user_id = $_SESSION['user_id'];
+    $sig_id  = (int)($_POST['sig_id'] ?? 0);
+
+    // Verifica se o usuário é moderador do SIG
+    $chk = $pdo->prepare("SELECT role FROM sig_memberships WHERE user_id = ? AND sig_id = ?");
+    $chk->execute([$user_id, $sig_id]);
+    $membership = $chk->fetch();
+    if (!$membership || $membership['role'] !== 'mod') {
+        header("Location: sig.php?id=$sig_id");
+        exit;
+    }
+
+    if (isset($_FILES['sig_icon']) && $_FILES['sig_icon']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath   = $_FILES['sig_icon']['tmp_name'];
+        $fileName      = $_FILES['sig_icon']['name'];
+        $fileSize      = $_FILES['sig_icon']['size'];
+        $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        if (in_array($fileExtension, $allowedExtensions) && $fileSize <= 2 * 1024 * 1024) {
+            $uploadDir = './uploads/sigs/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $newFileName = 'sig_' . $sig_id . '_' . time() . '.' . $fileExtension;
+            $destPath    = $uploadDir . $newFileName;
+
+            if (move_uploaded_file($fileTmpPath, $destPath)) {
+                $stmt = $pdo->prepare("UPDATE sigs SET icon = ? WHERE id = ?");
+                $stmt->execute([$newFileName, $sig_id]);
+            }
+        }
+    }
+
+    header("Location: " . ($_POST['redirect'] ?? "sig.php?id=$sig_id"));
+    exit;
+
 } elseif ($action === 'update_profile') {
     if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
     $bio = trim($_POST['bio']);
